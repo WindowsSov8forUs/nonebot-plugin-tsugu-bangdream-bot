@@ -6,7 +6,7 @@
 
 <div align="center">
 
-# nonebot-plugin-tsugu-bangdream-bot
+# NoneBot-Plugin-Tsugu-BanGDream-Bot
 
 _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-bangdream-bot) 的 NoneBot2 实现 ✨_
 
