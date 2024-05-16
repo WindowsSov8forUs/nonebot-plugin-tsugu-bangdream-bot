@@ -28,6 +28,9 @@ jobs:
       - name: Check Version
         if: steps.version.outputs.VERSION != steps.version.outputs.TAG_VERSION
         run: exit 1
+      
+      - name: Debug output
+        run: echo "Username: ${{ secrets.PYPI_USERNAME }}, Password: ${{ secrets.PYPI_PASSWORD }}"
 
       - name: Publish Package
         run: |
