@@ -30,7 +30,7 @@ jobs:
         run: exit 1
       
       - name: Debug output
-        run: echo "Username: ${{ secrets.PYPI_USERNAME }}, Password: ${{ secrets.PYPI_PASSWORD }}"
+        run: echo "Username ${{ secrets.PYPI_USERNAME }}, Password ${{ secrets.PYPI_PASSWORD }}"
 
       - name: Publish Package
         run: |
