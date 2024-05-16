@@ -79,7 +79,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 
 在 nonebot2 项目的`.env`文件中添加下表中的必填配置
 
-**nonebot-plugin-tsugu-bangdream-bot** 并无必填配置，但扔建议对部分配置进行添加。
+**nonebot-plugin-tsugu-bangdream-bot** 并无必填配置，但仍然建议对部分配置进行添加。
 
 | 配置项 | 必填 | 默认值 | 说明 |
 |:-----:|:----:|:----:|:----:|
