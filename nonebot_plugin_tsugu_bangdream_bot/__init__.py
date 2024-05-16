@@ -13,7 +13,7 @@ from nonebot_plugin_alconna import load_builtin_plugin
 from nonebot_plugin_alconna import Command, Arparma, Extension, store_true
 from nonebot_plugin_alconna.uniseg import At, Text, Image, Reply, Segment, UniMessage
 
-require("nonebot-plugin-userinfo")
+require("nonebot_plugin_userinfo")
 
 from nonebot_plugin_userinfo import get_user_info
 
