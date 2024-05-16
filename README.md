@@ -15,7 +15,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
   <img src="https://img.shields.io/badge/tsugu bangdream bot-api-FFEE88" alt="license">
 </a>
 <a href="./LICENSE">
-    <img src="https://img.shields.io/github/license/owner/nonebot-plugin-tsugu-bangdream-bot.svg" alt="license">
+    <img src="https://img.shields.io/github/license/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot.svg" alt="license">
 </a>
 <a href="https://pypi.python.org/pypi/nonebot-plugin-tsugu-bangdream-bot">
     <img src="https://img.shields.io/pypi/v/nonebot-plugin-tsugu-bangdream-bot.svg" alt="pypi">
