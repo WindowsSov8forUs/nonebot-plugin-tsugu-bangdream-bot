@@ -31,6 +31,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 在 NoneBot2 上进行的对于 [koishi-plugin-tsugu-bangdream-bot](https://github.com/Yamamoto-2/tsugu-bangdream-bot) 的复刻，支持跨平台，支持自定义。
 
 > 基于 [NoneBot-Plugin-Alconna](https://github.com/nonebot/plugin-alconna) 和 [nonebot-plugin-userinfo](https://github.com/noneplugin/nonebot-plugin-userinfo) 实现跨平台支持。
+>
 > 基于 [tsugu-api-python](https://github.com/WindowsSov8forUs/tsugu-api-python) 实现与 Tsugu 后端的连接。
 
 ## 💿 安装
