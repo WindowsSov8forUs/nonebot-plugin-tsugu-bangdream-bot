@@ -13,6 +13,10 @@ from nonebot_plugin_alconna import load_builtin_plugin
 from nonebot_plugin_alconna import Command, Arparma, Extension, store_true
 from nonebot_plugin_alconna.uniseg import At, Text, Image, Reply, Segment, UniMessage
 
+require("nonebot-plugin-userinfo")
+
+from nonebot_plugin_userinfo import get_user_info
+
 load_builtin_plugin("help")
 
 from .config import Config
@@ -115,14 +119,15 @@ extension = NoSpaceExtension(config.tsugu_reply, config.tsugu_at, config.tsugu_n
 car_forwarding = on_regex(r"(^(\d{5,6})(.*)$)")
 
 @car_forwarding.handle()
-async def _(event: Event, group: Tuple[Any, ...] = RegexGroup()) -> None:
+async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> None:
+    user_info = await get_user_info(bot, event, event.get_user_id())
     try:
         response = await tsugu_api_async.station_submit_room_number(
             int(group[1]),
             group[0],
             "red",
-            event.get_user_id(),
-            event.get_user_id(),
+            user_info.user_id,
+            user_info.user_name,
             config.tsugu_bandori_station_token
         )
     except Exception as exception:
@@ -1005,6 +1010,6 @@ __plugin_meta__ = PluginMetadata(
     description="Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现",
     usage="\n".join([f"{key}: {value}" for key, value in USAGES.items()]),
     type="application",
-    homepage="",
+    homepage="https://github.com/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot",
     config=Config,
 )
