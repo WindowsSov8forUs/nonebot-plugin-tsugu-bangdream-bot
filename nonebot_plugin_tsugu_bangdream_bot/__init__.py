@@ -46,7 +46,7 @@ from ._commands import (
 )
 
 import tsugu_api_async
-from tsugu_api_async._typing import _ServerId
+from tsugu_api_core._typing import _ServerId
 
 class NoSpaceExtension(Extension):
     @property

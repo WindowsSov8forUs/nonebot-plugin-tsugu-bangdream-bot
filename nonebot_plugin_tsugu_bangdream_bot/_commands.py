@@ -2,7 +2,7 @@ from base64 import b64decode
 from typing import List, Tuple, Union, Optional, Sequence
 
 import tsugu_api_async
-from tsugu_api_async._typing import _Server, _ServerId, _DifficultyText
+from tsugu_api_core._typing import _Server, _ServerId, _DifficultyText
 
 from ._utils import server_id_to_full_name
 

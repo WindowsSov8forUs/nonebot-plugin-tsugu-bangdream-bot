@@ -1,4 +1,4 @@
-from tsugu_api_async._typing import _ServerId, _ServerName
+from tsugu_api_core._typing import _ServerId, _ServerName
 
 _COMMAND_KEYWORDS = [
     '查询玩家',

@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-tsugu-bangdream-bot"
-version = "0.1.3"
+version = "0.1.4"
 description = "Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现"
 authors = [
     {name = "WindowsSov8forUs", email = "qwertyuiop2333@hotmail.com"},
@@ -8,7 +8,7 @@ authors = [
 dependencies = [
     "nonebot2>=2.2.1",
     "nonebot-plugin-alconna>=0.42.4",
-    "tsugu-api-python>=1.1.7",
+    "tsugu-api-python>=1.2.0",
     "nonebot-plugin-userinfo>=0.2.4",
 ]
 requires-python = ">=3.8"
