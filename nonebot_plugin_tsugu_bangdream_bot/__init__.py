@@ -2,9 +2,9 @@ from typing import Any, List, Tuple, Union, Optional
 
 from nonebot.log import logger
 from nonebot.adapters import Bot, Event, Message
-from nonebot.plugin import PluginMetadata, require
 from nonebot.params import RegexGroup, ArgPlainText
 from nonebot import on_regex, get_driver, get_plugin_config
+from nonebot.plugin import PluginMetadata, require, inherit_supported_adapters
 
 require("nonebot_plugin_alconna")
 
@@ -96,6 +96,18 @@ class NoSpaceExtension(Extension):
         return send
 
 config = get_plugin_config(Config)
+
+__plugin_meta__ = PluginMetadata(
+    name="nonebot-plugin-tsugu-bangdream-bot",
+    description="Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现",
+    usage="\n".join([f"{key}: {value}" for key, value in USAGES.items()]),
+    type="application",
+    homepage="https://github.com/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot",
+    config=Config,
+    supported_adapters=inherit_supported_adapters(
+        "nonebot_plugin_alconna", "nonebot_plugin_userinfo"
+    )
+)
 
 if "httpx" in get_driver().type:
     tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
@@ -1004,12 +1016,3 @@ async def _(arp: Arparma, event: Event) -> None:
             segments.append(Image(raw=_r))
     
     await gacha_simulate.finish(UniMessage(segments))
-
-__plugin_meta__ = PluginMetadata(
-    name="nonebot-plugin-tsugu-bangdream-bot",
-    description="Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现",
-    usage="\n".join([f"{key}: {value}" for key, value in USAGES.items()]),
-    type="application",
-    homepage="https://github.com/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot",
-    config=Config,
-)
