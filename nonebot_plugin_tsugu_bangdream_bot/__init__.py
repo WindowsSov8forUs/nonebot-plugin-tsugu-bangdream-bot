@@ -31,6 +31,7 @@ from ._commands import (
     player_info,
     search_card,
     search_song,
+    forward_room,
     search_event,
     search_gacha,
     search_lsycx,
@@ -46,7 +47,7 @@ from ._commands import (
 )
 
 import tsugu_api_async
-from tsugu_api_core._typing import _ServerId
+from tsugu_api_core._typing import _ServerId, _TsuguUser
 
 class NoSpaceExtension(Extension):
     @property
@@ -129,6 +130,17 @@ tsugu_api_async.settings.timeout = config.tsugu_timeout
 
 extension = NoSpaceExtension(config.tsugu_reply, config.tsugu_at, config.tsugu_no_space)
 
+async def _get_tsugu_user(event: Event) -> _TsuguUser:
+    response = await tsugu_api_async.get_user_data("red", event.get_user_id())
+    
+    if response["status"] == "failed":
+        raise ValueError(response["data"])
+    
+    if not isinstance(response["data"], dict):
+        raise RuntimeError("Unexpected /getUserData response.data type.")
+    
+    return response["data"]
+
 car_forwarding = on_regex(r"(^(\d{5,6})(.*)$)")
 
 @car_forwarding.handle()
@@ -136,21 +148,27 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
     user_info = await get_user_info(bot, event, event.get_user_id())
     
     try:
-        response = await tsugu_api_async.station_submit_room_number(
+        tsugu_user = await _get_tsugu_user(event)
+    except Exception as exception:
+        logger.warning(f"Failed to get user data: {exception}")
+        car_forwarding.skip()
+    
+    try:
+        is_forwarded = await forward_room(
             int(group[1]),
             group[0],
+            tsugu_user,
             "red",
             user_info.user_id if user_info is not None else event.get_user_id(),
             user_info.user_name if user_info is not None else event.get_user_id(),
             config.tsugu_bandori_station_token
         )
     except Exception as exception:
-        logger.error(f"Failed to submit room number: {exception}")
-        await car_forwarding.finish()
+        logger.warning(f"Failed to submit room number: {exception}")
+        car_forwarding.skip()
     
-    if response["status"] == "failed":
-        logger.warning(f"Failed to submit room number: {response['data']}")
-        await car_forwarding.finish()
+    if is_forwarded:
+        logger.debug(f"Submitted room number: {group[0]}")
 
 open_forward = Command("开启车牌转发", "开启车牌转发").build(aliases=config.tsugu_open_forward_aliases, extensions=[extension])
 

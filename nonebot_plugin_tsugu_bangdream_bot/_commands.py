@@ -1,10 +1,60 @@
 from base64 import b64decode
 from typing import List, Tuple, Union, Optional, Sequence
 
+from nonebot import logger
+
 import tsugu_api_async
-from tsugu_api_core._typing import _Server, _ServerId, _DifficultyText
+from tsugu_api_core._typing import _Server, _ServerId, _TsuguUser, _DifficultyText
+
+from .config import CAR, FAKE
 
 from ._utils import server_id_to_full_name
+
+async def forward_room(
+    room_number: int,
+    raw_message: str,
+    tsugu_user: _TsuguUser,
+    platform: str,
+    user_id: str,
+    user_name: str,
+    bandori_station_token: Optional[str]
+) -> bool:
+    if not tsugu_user["car"]:
+        logger.debug("User is disabled to forward room number")
+        return False
+    
+    is_car: bool = False
+    for _car in CAR:
+        if _car in raw_message:
+            is_car = True
+            break
+    
+    if not is_car:
+        return False
+    
+    for _fake in FAKE:
+        if _fake in raw_message:
+            logger.debug(f"Invalid keyword in message: {_fake}")
+            return False
+    
+    try:
+        response = await tsugu_api_async.station_submit_room_number(
+            room_number,
+            raw_message,
+            platform,
+            user_id,
+            user_name,
+            bandori_station_token
+        )
+    except Exception as exception:
+        logger.warning(f"Failed to submit room number: {exception}")
+        return False
+    
+    if response["status"] == "success":
+        return True
+    else:
+        logger.warning(f"Failed to submit room number: {response['data']}")
+        return False
 
 async def switch_forward(user_id: str, mode: bool) -> str:
     try:
