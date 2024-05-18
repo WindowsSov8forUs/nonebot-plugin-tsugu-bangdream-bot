@@ -92,6 +92,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 | TSUGU_BACKEND_URL | 否 | `"http://tsugubot.com:8080"` | 后端服务器地址，用于处理指令。如果有自建服务器，可以改成自建服务器地址。默认为Tsugu公共后端服务器。 |
 | TSUGU_DATA_BACKEND_URL | 否 | `"http://tsugubot.com:8080"` | 用户数据后端服务器地址，用于处理用户与车牌指令。如果有自建服务器，可以改成自建服务器地址。默认为Tsugu公共后端服务器。 |
 | TSUGU_PROXY | 否 | `""` | 使用的代理服务器。在部分地区，网络环境可能无法连接后端服务器。通过此配置项配置代理服务器。 |
+| TSUGU_TIMEOUT | 否 | `10` | 后端服务器的响应超时时间（秒） |
 | TSUGU_BACKEND_PROXY | 否 | `False` | 是否通过代理服务器访问后端服务器 |
 | TSUGU_OPEN_FORWARD_ALIASES | 否 | `()` | 开启车牌转发指令别名 |
 | TSUGU_CLOSE_FORWARD_ALIASES | 否 | `()` | 关闭车牌转发指令别名 |

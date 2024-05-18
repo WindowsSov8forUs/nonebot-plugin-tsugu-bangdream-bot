@@ -19,6 +19,7 @@ class Config(BaseModel):
     tsugu_proxy: str = ""
     tsugu_backend_proxy: bool = False
     tsugu_data_backend_proxy: bool = False
+    tsugu_timeout: int = 10
     
     tsugu_open_forward_aliases: Set[str] = set()
     tsugu_close_forward_aliases: Set[str] = set()

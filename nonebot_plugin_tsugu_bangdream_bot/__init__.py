@@ -125,6 +125,7 @@ if len(config.tsugu_data_backend_url) > 0:
 tsugu_api_async.settings.proxy = config.tsugu_proxy
 tsugu_api_async.settings.backend_proxy = config.tsugu_backend_proxy
 tsugu_api_async.settings.userdata_backend_proxy = config.tsugu_data_backend_proxy
+tsugu_api_async.settings.timeout = config.tsugu_timeout
 
 extension = NoSpaceExtension(config.tsugu_reply, config.tsugu_at, config.tsugu_no_space)
 
