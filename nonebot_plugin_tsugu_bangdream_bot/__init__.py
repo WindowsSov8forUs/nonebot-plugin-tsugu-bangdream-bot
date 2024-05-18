@@ -133,13 +133,14 @@ car_forwarding = on_regex(r"(^(\d{5,6})(.*)$)")
 @car_forwarding.handle()
 async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> None:
     user_info = await get_user_info(bot, event, event.get_user_id())
+    
     try:
         response = await tsugu_api_async.station_submit_room_number(
             int(group[1]),
             group[0],
             "red",
-            user_info.user_id,
-            user_info.user_name,
+            user_info.user_id if user_info is not None else event.get_user_id(),
+            user_info.user_name if user_info is not None else event.get_user_id(),
             config.tsugu_bandori_station_token
         )
     except Exception as exception:
