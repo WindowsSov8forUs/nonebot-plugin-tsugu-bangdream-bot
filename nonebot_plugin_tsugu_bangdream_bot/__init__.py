@@ -72,8 +72,11 @@ class NoSpaceExtension(Extension):
         if self.no_space:
             msg = msg.extract_plain_text().strip()
             for keyword in COMMAND_KEYWORDS:
-                if msg.startswith(keyword) and not msg.startswith(keyword + " "):
-                    msg = msg.replace(keyword, keyword + " ", 1)
+                if msg.startswith(keyword):
+                    if not msg.startswith(keyword + " "):
+                        msg = msg.replace(keyword, keyword + " ", 1)
+                    
+                    break
             
             return UniMessage(msg)
         else:
