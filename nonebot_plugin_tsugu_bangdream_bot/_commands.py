@@ -11,10 +11,6 @@ from .config import CAR, FAKE
 from ._utils import server_id_to_full_name
 
 async def _get_tsugu_user(platform: str, user_id: str) -> Union[_TsuguUser, str]:
-    # 历史遗留处理
-    if platform == "onebot" or platform == "chronocat":
-        platform = "red"
-    
     try:
         response = await tsugu_api_async.get_user_data(platform, user_id)
     except Exception as exception:
