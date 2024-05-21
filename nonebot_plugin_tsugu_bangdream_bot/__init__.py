@@ -437,7 +437,7 @@ async def _(arp: Arparma, event: Event) -> None:
     await player_search.finish(UniMessage(segments))
 
 card_search = (
-    Command("查卡 <word:str+:>", "查卡").alias("查卡牌")
+    Command("查卡 <word:str*>", "查卡").alias("查卡牌")
     .usage("根据关键词或卡牌ID查询卡片信息，请使用空格隔开所有参数")
     .example("查卡 1399 :返回1399号卡牌的信息")
     .example("查卡 绿 tsugu :返回所有属性为pure的羽泽鸫的卡牌列表")
@@ -455,11 +455,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await card_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await card_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -526,11 +526,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await character_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await character_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -567,11 +567,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await event_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await event_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -608,11 +608,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await song_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await song_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -656,18 +656,18 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await chart_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await chart_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
     _servers = tsugu_user["default_server"]
 
     try:
-        response = await song_chart(_servers, song_id, difficulty) # type: ignore
+        response = await song_chart(_servers, song_id, difficulty)
     except Exception as exception:
         await chart_search.finish(f"错误: {exception}")
     
@@ -681,7 +681,7 @@ async def _(arp: Arparma, event: Event) -> None:
     await chart_search.finish(UniMessage(segments))
 
 meta_search = (
-    Command("查询分数表 <word:str+>", "查询分数表").usage("查询指定服务器的歌曲分数表，如果没有服务器名的话，服务器为用户的默认服务器")
+    Command("查询分数表 <word:str*>", "查询分数表").usage("查询指定服务器的歌曲分数表，如果没有服务器名的话，服务器为用户的默认服务器")
     .alias("查分数表").alias("查询分数榜").alias("查分数榜")
     .example("查询分数表 cn :返回国服的歌曲分数表")
     .build(auto_send_output=True, aliases=config.tsugu_song_meta_aliases, extensions=[extension])
@@ -698,20 +698,25 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await meta_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await meta_search.finish(_response["data"])
     
-    try:
-        _server = server_name_to_id(word)
-    except ValueError:
-        await meta_search.finish("错误: 服务器不存在")
+    if len(word) < 1:
+        try:
+            _server = server_name_to_id(word)
+        except ValueError:
+            await meta_search.finish("错误: 服务器不存在")
+    else:
+        _server = None
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
     _servers = tsugu_user["default_server"]
+    if _server is None:
+        _server = tsugu_user["server_mode"]
 
     try:
         response = await song_meta(_servers, _server)
@@ -747,16 +752,16 @@ async def _(arp: Arparma, event: Event) -> None:
     if (option := arp.options.get("meta", None)) is None:
         meta = False
     else:
-        meta = option.value
+        meta: bool = option.value
     
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await stage_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await stage_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -794,11 +799,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await gacha_search.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await gacha_search.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -856,11 +861,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await ycx.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await ycx.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -909,11 +914,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await ycx_all.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await ycx_all.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -971,11 +976,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await lsycx.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await lsycx.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
@@ -1016,11 +1021,11 @@ async def _(arp: Arparma, event: Event) -> None:
     try:
         _response = await tsugu_api_async.get_user_data("red", event.get_user_id())
     except Exception as exception:
-        await player_search.finish(f"错误: {exception}")
+        await gacha_simulate.finish(f"错误: {exception}")
     
     if _response["status"] == "failed":
         assert isinstance(_response["data"], str)
-        await player_search.finish(_response["data"])
+        await gacha_simulate.finish(_response["data"])
     
     assert isinstance(_response["data"], dict)
     tsugu_user = _response["data"]
