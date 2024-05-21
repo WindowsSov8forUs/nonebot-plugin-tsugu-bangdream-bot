@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-tsugu-bangdream-bot"
-version = "0.1.5"
+version = "0.1.6"
 description = "Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现"
 authors = [
     {name = "WindowsSov8forUs", email = "qwertyuiop2333@hotmail.com"},

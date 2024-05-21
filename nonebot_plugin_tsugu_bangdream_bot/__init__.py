@@ -116,7 +116,7 @@ class TsuguExtension(Extension):
         if self.at:
             try:
                 user_id = event.get_user_id()
-                send = At('user', target=user_id) + send
+                send = At('user', target=user_id) + " " + send
             except:
                 pass
         if self.reply:
