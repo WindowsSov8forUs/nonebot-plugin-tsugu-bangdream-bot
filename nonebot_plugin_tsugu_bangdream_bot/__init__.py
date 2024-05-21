@@ -271,7 +271,7 @@ main_server = (
     .usage("将指定的服务器设置为你的主服务器")
     .example("主服务器 cn : 将国服设置为主服务器")
     .example("日服模式 : 将日服设置为主服务器")
-    .shortcut(r"(.+服)模式$", {"args": ["{0}"]})
+    .shortcut(r"(.+服)模式$", {"args": ["{0}"], "prefix": True})
     .build(auto_send_output=True, aliases=config.tsugu_main_server_aliases, extensions=[extension], use_cmd_start=True)
 )
 
