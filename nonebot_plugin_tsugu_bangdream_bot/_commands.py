@@ -10,10 +10,11 @@ from .config import CAR, FAKE
 
 from ._utils import server_id_to_full_name
 
-platform = "red"
-"""以 QQ 平台的历史遗留为准，默认所有平台皆为 red 平台，当有获取平台方法时再进行对应处理。"""
-
-async def _get_tsugu_user(user_id: str, platform: str) -> Union[_TsuguUser, str]:
+async def _get_tsugu_user(platform: str, user_id: str) -> Union[_TsuguUser, str]:
+    # 历史遗留处理
+    if platform == "onebot" or platform == "chronocat":
+        platform = "red"
+    
     try:
         response = await tsugu_api_async.get_user_data(platform, user_id)
     except Exception as exception:
@@ -72,10 +73,10 @@ async def forward_room(
         logger.warning(f"Failed to submit room number: {response['data']}")
         return False
 
-async def switch_forward(user_id: str, mode: bool) -> str:
+async def switch_forward(platform: str, user_id: str, mode: bool) -> str:
     try:
         response = await tsugu_api_async.change_user_data(
-            "red",
+            platform,
             user_id,
             {'car': mode}
         )
@@ -92,9 +93,9 @@ async def switch_forward(user_id: str, mode: bool) -> str:
             + "车牌转发"
         )
 
-async def player_bind(user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId]]:
+async def player_bind(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return f"错误: {exception}", False, None
     
@@ -105,7 +106,7 @@ async def player_bind(user_id: str, server: Optional[_ServerId]=None) -> Tuple[s
         server = tsugu_user["server_mode"]
     
     try:
-        response = await tsugu_api_async.bind_player_request("red", user_id, server, True)
+        response = await tsugu_api_async.bind_player_request(platform, user_id, server, True)
     except Exception as exception:
         return f"错误: {exception}", False, None
     
@@ -121,9 +122,9 @@ async def player_bind(user_id: str, server: Optional[_ServerId]=None) -> Tuple[s
         + f"{verify_code}"
     ), True, server
 
-async def player_unbind(user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId], Optional[int]]:
+async def player_unbind(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId], Optional[int]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return f"错误: {exception}", False, None, None
     
@@ -136,7 +137,7 @@ async def player_unbind(user_id: str, server: Optional[_ServerId]=None) -> Tuple
     tsugu_user_server = tsugu_user["server_list"][server]
     
     try:
-        response = await tsugu_api_async.bind_player_request("red", user_id, server, False)
+        response = await tsugu_api_async.bind_player_request(platform, user_id, server, False)
     except Exception as exception:
         return f"错误: {exception}", False, None, None
     
@@ -153,10 +154,10 @@ async def player_unbind(user_id: str, server: Optional[_ServerId]=None) -> Tuple
         + f"{verify_code}"
     ), True, server, tsugu_user_server["playerId"]
 
-async def switch_main_server(user_id: str, server: _ServerId) -> str:
+async def switch_main_server(platform: str, user_id: str, server: _ServerId) -> str:
     try:
         response = await tsugu_api_async.change_user_data(
-            "red",
+            platform,
             user_id,
             {'server_mode': server}
         )
@@ -171,10 +172,10 @@ async def switch_main_server(user_id: str, server: _ServerId) -> str:
         f"已切换到{server_id_to_full_name(server)}模式"
     )
 
-async def set_default_servers(user_id: str, servers: List[_ServerId]) -> str:
+async def set_default_servers(platform: str, user_id: str, servers: List[_ServerId]) -> str:
     try:
         response = await tsugu_api_async.change_user_data(
-            "red",
+            platform,
             user_id,
             {"default_server": servers}
         )
@@ -189,9 +190,9 @@ async def set_default_servers(user_id: str, servers: List[_ServerId]) -> str:
         f"成功切换默认服务器顺序: {', '.join(server_id_to_full_name(server) for server in servers)}"
     )
 
-async def player_info(user_id: str, server: Optional[_ServerId]=None) -> List[Union[str, bytes]]:
+async def player_info(platform: str, user_id: str, server: Optional[_ServerId]=None) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -205,12 +206,12 @@ async def player_info(user_id: str, server: Optional[_ServerId]=None) -> List[Un
     if (user_server := tsugu_user["server_list"][server])["bindingStatus"] != 2:
         return [f"错误: 未检测到{server_id_to_full_name(server)}的玩家数据"]
     
-    return await search_player(user_id, user_server["playerId"], server)
+    return await search_player(platform, user_id, user_server["playerId"], server)
     
-async def search_player(user_id: str, player_id: int, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def search_player(platform: str, user_id: str, player_id: int, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
     if server is None:
         try:
-            tsugu_user = await _get_tsugu_user(user_id, platform)
+            tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
             return [f"错误: {exception}"]
         
@@ -258,9 +259,9 @@ async def room_list(keyword: Optional[str]=None) -> List[Union[str, bytes]]:
     
     return result
 
-async def search_card(user_id: str, word: str) -> List[Union[str, bytes]]:
+async def search_card(platform: str, user_id: str, word: str) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -298,9 +299,9 @@ async def get_card_illustration(card_id: int) -> List[Union[str, bytes]]:
     
     return result
 
-async def search_character(user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_character(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -323,9 +324,9 @@ async def search_character(user_id: str, text: str) -> List[Union[str, bytes]]:
     
     return result
 
-async def search_event(user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_event(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -348,9 +349,9 @@ async def search_event(user_id: str, text: str) -> List[Union[str, bytes]]:
     
     return result
 
-async def search_song(user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_song(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -373,9 +374,9 @@ async def search_song(user_id: str, text: str) -> List[Union[str, bytes]]:
     
     return result
 
-async def song_chart(user_id: str, song_id: int, difficulty_text: _DifficultyText) -> List[Union[str, bytes]]:
+async def song_chart(platform: str, user_id: str, song_id: int, difficulty_text: _DifficultyText) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -398,9 +399,9 @@ async def song_chart(user_id: str, song_id: int, difficulty_text: _DifficultyTex
     
     return result
 
-async def song_meta(user_id: str, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def song_meta(platform: str, user_id: str, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -425,9 +426,9 @@ async def song_meta(user_id: str, server: Optional[_Server]=None) -> List[Union[
     
     return result
 
-async def event_stage(user_id: str, event_id: Optional[int]=None, meta: bool=False) -> List[Union[str, bytes]]:
+async def event_stage(platform: str, user_id: str, event_id: Optional[int]=None, meta: bool=False) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -450,9 +451,9 @@ async def event_stage(user_id: str, event_id: Optional[int]=None, meta: bool=Fal
     
     return result
 
-async def search_gacha(user_id: str, gacha_id: int) -> List[Union[str, bytes]]:
+async def search_gacha(platform: str, user_id: str, gacha_id: int) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     
@@ -475,10 +476,10 @@ async def search_gacha(user_id: str, gacha_id: int) -> List[Union[str, bytes]]:
     
     return result
 
-async def search_ycx(user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
     if server is None:
         try:
-            tsugu_user = await _get_tsugu_user(user_id, platform)
+            tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
             return [f"错误: {exception}"]
         
@@ -501,10 +502,10 @@ async def search_ycx(user_id: str, tier: int, event_id: Optional[int]=None, serv
     
     return result
 
-async def search_ycx_all(user_id: str, server: Optional[_Server]=None, event_id: Optional[int]=None) -> List[Union[str, bytes]]:
+async def search_ycx_all(platform: str, user_id: str, server: Optional[_Server]=None, event_id: Optional[int]=None) -> List[Union[str, bytes]]:
     if server is None:
         try:
-            tsugu_user = await _get_tsugu_user(user_id, platform)
+            tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
             return [f"错误: {exception}"]
         
@@ -527,10 +528,10 @@ async def search_ycx_all(user_id: str, server: Optional[_Server]=None, event_id:
     
     return result
 
-async def search_lsycx(user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
     if server is None:
         try:
-            tsugu_user = await _get_tsugu_user(user_id, platform)
+            tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
             return [f"错误: {exception}"]
         
@@ -553,9 +554,9 @@ async def search_lsycx(user_id: str, tier: int, event_id: Optional[int]=None, se
     
     return result
 
-async def simulate_gacha(user_id: str, times: Optional[int]=None, gacha_id: Optional[int]=None) -> List[Union[str, bytes]]:
+async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None, gacha_id: Optional[int]=None) -> List[Union[str, bytes]]:
     try:
-        tsugu_user = await _get_tsugu_user(user_id, platform)
+        tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
         return [f"错误: {exception}"]
     

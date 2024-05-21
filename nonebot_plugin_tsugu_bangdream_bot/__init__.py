@@ -21,7 +21,6 @@ from nonebot_plugin_userinfo import get_user_info
 from .config import Config
 from ._utils import USAGES, server_name_to_id, tier_list_of_server_to_string
 from ._commands import (
-    platform,
     room_list,
     song_meta,
     song_chart,
@@ -127,6 +126,25 @@ tsugu_api_async.settings.timeout = config.tsugu_timeout
 extension = TsuguExtension(config.tsugu_reply, config.tsugu_at)
 meta = CommandMeta(compact=config.tsugu_no_space)
 
+def _get_platform(bot: Bot) -> str:
+    adapter_name = bot.adapter.get_name().lower()
+    print(adapter_name)
+    if adapter_name.startswith("onebot"):
+        return "onebot"
+    elif adapter_name == "satori":
+        try:
+            from nonebot.adapters.satori import Bot as SatoriBot
+            if isinstance(bot, SatoriBot):
+                print(bot.platform)
+                return bot.platform
+            else:
+                return "satori"
+        except:
+            logger.warning("Got Satori adapter, but failed to get platform")
+            return adapter_name
+    else:
+        return adapter_name
+
 car_forwarding = on_regex(r"(^(\d{5,6})(.*)$)")
 
 @car_forwarding.handle()
@@ -134,7 +152,7 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
     user_info = await get_user_info(bot, event, event.get_user_id())
     
     try:
-        tsugu_user = await _get_tsugu_user(event.get_user_id(), platform)
+        tsugu_user = await _get_tsugu_user(_get_platform(bot), event.get_user_id())
     except Exception as exception:
         logger.warning(f"Failed to get user data: {exception}")
         car_forwarding.skip()
@@ -163,16 +181,16 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
 open_forward = Command("开启车牌转发", "开启车牌转发", meta=meta).build(auto_send_output=True, aliases=config.tsugu_open_forward_aliases, extensions=[extension], use_cmd_start=True)
 
 @open_forward.handle()
-async def _(event: Event) -> None:
+async def _(bot: Bot, event: Event) -> None:
     user_id = event.get_user_id()
-    await open_forward.send(await switch_forward(user_id, True))
+    await open_forward.send(await switch_forward(_get_platform(bot), user_id, True))
 
 close_forward = Command("关闭车牌转发", "关闭车牌转发", meta=meta).build(auto_send_output=True, aliases=config.tsugu_close_forward_aliases, extensions=[extension], use_cmd_start=True)
 
 @close_forward.handle()
-async def _(event: Event) -> None:
+async def _(bot: Bot, event: Event) -> None:
     user_id = event.get_user_id()
-    await close_forward.send(await switch_forward(user_id, False))
+    await close_forward.send(await switch_forward(_get_platform(bot), user_id, False))
 
 bind_player = (
     Command("绑定玩家 [server_name:str]", "绑定玩家信息", meta=meta)
@@ -181,7 +199,7 @@ bind_player = (
 )
 
 @bind_player.handle()
-async def _(server_name: Match[str], event: Event) -> None:
+async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
     if server_name.available:
         try:
             _server = server_name_to_id(server_name.result)
@@ -190,7 +208,7 @@ async def _(server_name: Match[str], event: Event) -> None:
     else:
         _server = None
     
-    reply, available, server = await player_bind(event.get_user_id(), _server)
+    reply, available, server = await player_bind(_get_platform(bot), event.get_user_id(), _server)
     
     if not available:
         await bind_player.finish(reply)
@@ -199,14 +217,14 @@ async def _(server_name: Match[str], event: Event) -> None:
         await bind_player.send(reply)
 
 @bind_player.got("player_id")
-async def _(event: Event, player_id: str = ArgPlainText()) -> None:
+async def _(bot: Bot, event: Event, player_id: str = ArgPlainText()) -> None:
     if not player_id.isnumeric():
         await bind_player.finish("错误: 无效的玩家id")
     
     server = bind_player.get_path_arg("verify_server", None)
     assert server is not None
     
-    response = await tsugu_api_async.bind_player_verification("red", event.get_user_id(), server, int(player_id), True)
+    response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), True)
     
     await bind_player.finish(response["data"])
 
@@ -217,7 +235,7 @@ unbind_player = (
 )
 
 @unbind_player.handle()
-async def _(server_name: Match[str], event: Event) -> None:
+async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
     if server_name.available:
         try:
             _server = server_name_to_id(server_name.result)
@@ -226,7 +244,7 @@ async def _(server_name: Match[str], event: Event) -> None:
     else:
         _server = None
     
-    reply, available, server, player_id = await player_unbind(event.get_user_id(), _server)
+    reply, available, server, player_id = await player_unbind(_get_platform(bot), event.get_user_id(), _server)
     
     if not available:
         await unbind_player.finish(reply)
@@ -236,14 +254,14 @@ async def _(server_name: Match[str], event: Event) -> None:
         await unbind_player.send(reply)
 
 @unbind_player.got("_anything")
-async def _(event: Event) -> None:
+async def _(bot: Bot, event: Event) -> None:
     server = unbind_player.get_path_arg("verify_server", None)
     assert server is not None
     
     player_id = unbind_player.get_path_arg("player_id", None)
     assert player_id is not None
     
-    response = await tsugu_api_async.bind_player_verification("red", event.get_user_id(), server, int(player_id), False)
+    response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), False)
     
     await unbind_player.finish(response["data"])
 
@@ -253,18 +271,18 @@ main_server = (
     .usage("将指定的服务器设置为你的主服务器")
     .example("主服务器 cn : 将国服设置为主服务器")
     .example("日服模式 : 将日服设置为主服务器")
-    .shortcut(r"^(.+服)模式$", {"args": ["{0}"]})
+    .shortcut(r"(.+服)模式$", {"args": ["{0}"]})
     .build(auto_send_output=True, aliases=config.tsugu_main_server_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @main_server.handle()
-async def _(server_name: Match[str], event: Event) -> None:
+async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
     if server_name.available:
         try:
             _server = server_name_to_id(server_name.result)
         except ValueError:
             await main_server.finish("错误: 服务器不存在")
-        await main_server.finish(await switch_main_server(event.get_user_id(), _server))
+        await main_server.finish(await switch_main_server(_get_platform(bot), event.get_user_id(), _server))
     else:
         await main_server.finish("错误: 未指定服务器")
 
@@ -277,7 +295,7 @@ default_servers = (
 )
 
 @default_servers.handle()
-async def _(server_list: List[str], event: Event) -> None:
+async def _(server_list: List[str], bot: Bot, event: Event) -> None:
     if len(server_list) > 0:
         servers: List[_ServerId] = []
         for _server in server_list:
@@ -291,7 +309,7 @@ async def _(server_list: List[str], event: Event) -> None:
         if len(servers) < 1:
             await default_servers.finish("错误: 请指定至少一个服务器")
         
-        await default_servers.finish(await set_default_servers(event.get_user_id(), servers))
+        await default_servers.finish(await set_default_servers(_get_platform(bot), event.get_user_id(), servers))
     else:
         await default_servers.finish("错误: 请指定至少一个服务器")
 
@@ -302,7 +320,7 @@ player_status = (
 )
 
 @player_status.handle()
-async def _(server_name: Match[str], event: Event) -> None:
+async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
     if server_name.available:
         try:
             _server = server_name_to_id(server_name.result)
@@ -311,7 +329,7 @@ async def _(server_name: Match[str], event: Event) -> None:
     else:
         _server = None
     
-    result = await player_info(event.get_user_id(), _server)
+    result = await player_info(_get_platform(bot), event.get_user_id(), _server)
     segments: List[Segment] = []
     for _r in result:
         if isinstance(_r, str):
@@ -360,7 +378,7 @@ player_search = (
 )
 
 @player_search.handle()
-async def _(player_id: Match[int], server_name: Match[str], event: Event) -> None:
+async def _(player_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
     if not player_id.available:
         await player_search.finish("错误: 未指定玩家ID")
     
@@ -372,7 +390,7 @@ async def _(player_id: Match[int], server_name: Match[str], event: Event) -> Non
     else:
         _server = None
     
-    result = await search_player(event.get_user_id(), player_id.result, _server)
+    result = await search_player(_get_platform(bot), event.get_user_id(), player_id.result, _server)
     segments: List[Segment] = []
     for _r in result:
         if isinstance(_r, str):
@@ -391,9 +409,9 @@ card_search = (
 )
 
 @card_search.handle()
-async def _(word: List[str], event: Event) -> None:
+async def _(word: List[str], bot: Bot, event: Event) -> None:
     try:
-        response = await search_card(event.get_user_id(), " ".join(word))
+        response = await search_card(_get_platform(bot), event.get_user_id(), " ".join(word))
     except Exception as exception:
         await card_search.finish(f"错误: {exception}")
     
@@ -438,9 +456,9 @@ character_search = (
 )
 
 @character_search.handle()
-async def _(word: List[str], event: Event) -> None:
+async def _(word: List[str], bot: Bot, event: Event) -> None:
     try:
-        response = await search_character(event.get_user_id(), " ".join(word))
+        response = await search_character(_get_platform(bot), event.get_user_id(), " ".join(word))
     except Exception as exception:
         await character_search.finish(f"错误: {exception}")
     
@@ -460,9 +478,9 @@ event_search = (
 )
 
 @event_search.handle()
-async def _(word: List[str], event: Event) -> None:
+async def _(word: List[str], bot: Bot, event: Event) -> None:
     try:
-        response = await search_event(event.get_user_id(), " ".join(word))
+        response = await search_event(_get_platform(bot), event.get_user_id(), " ".join(word))
     except Exception as exception:
         await event_search.finish(f"错误: {exception}")
     
@@ -482,9 +500,9 @@ song_search = (
 )
 
 @song_search.handle()
-async def _(word: List[str], event: Event) -> None:
+async def _(word: List[str], bot: Bot, event: Event) -> None:
     try:
-        response = await search_song(event.get_user_id(), " ".join(word))
+        response = await search_song(_get_platform(bot), event.get_user_id(), " ".join(word))
     except Exception as exception:
         await song_search.finish(f"错误: {exception}")
     
@@ -504,12 +522,12 @@ chart_search = (
 )
 
 @chart_search.handle()
-async def _(song_id: Match[int], event: Event, difficulty: str = "expert") -> None:
+async def _(song_id: Match[int], bot: Bot, event: Event, difficulty: str = "expert") -> None:
     if not song_id.available:
         await chart_search.finish("错误: 未指定曲目ID")
     
     try:
-        response = await song_chart(event.get_user_id(), song_id.result, difficulty) # type: ignore
+        response = await song_chart(_get_platform(bot), event.get_user_id(), song_id.result, difficulty) # type: ignore
     except Exception as exception:
         await chart_search.finish(f"错误: {exception}")
     
@@ -530,7 +548,7 @@ meta_search = (
 )
 
 @meta_search.handle()
-async def _(word: Match[str], event: Event) -> None:
+async def _(word: Match[str], bot: Bot, event: Event) -> None:
     if word.available:
         try:
             _server = server_name_to_id(word.result)
@@ -540,7 +558,7 @@ async def _(word: Match[str], event: Event) -> None:
         _server = None
     
     try:
-        response = await song_meta(event.get_user_id(), _server)
+        response = await song_meta(_get_platform(bot), event.get_user_id(), _server)
     except Exception as exception:
         await meta_search.finish(f"错误: {exception}")
     
@@ -564,14 +582,14 @@ stage_search = (
 )
 
 @stage_search.handle()
-async def _(event_id: Match[int], event: Event, meta: Query[bool]=Query("meta.value", False)) -> None:
+async def _(event_id: Match[int], bot: Bot, event: Event, meta: Query[bool]=Query("meta.value", False)) -> None:
     if event_id.available:
         _event_id = event_id.result
     else:
         _event_id = None
     
     try:
-        response = await event_stage(event.get_user_id(), _event_id, meta.result)
+        response = await event_stage(_get_platform(bot), event.get_user_id(), _event_id, meta.result)
     except Exception as exception:
         await stage_search.finish(f"错误: {exception}")
     
@@ -590,12 +608,12 @@ gacha_search = (
 )
 
 @gacha_search.handle()
-async def _(gacha_id: Match[int], event: Event) -> None:
+async def _(gacha_id: Match[int], bot: Bot, event: Event) -> None:
     if not gacha_id.available:
         await gacha_search.finish("错误: 未指定卡池ID")
     
     try:
-        response = await search_gacha(event.get_user_id(), gacha_id.result)
+        response = await search_gacha(_get_platform(bot), event.get_user_id(), gacha_id.result)
     except Exception as exception:
         await gacha_search.finish(f"错误: {exception}")
     
@@ -617,7 +635,7 @@ ycx = (
 )
 
 @ycx.handle()
-async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], event: Event) -> None:
+async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
     if not tier.available:
         await ycx.finish("请输入排名")
     
@@ -635,7 +653,7 @@ async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], eve
         _server = None
     
     try:
-        response = await search_ycx(event.get_user_id(), tier.result, _event_id, _server)
+        response = await search_ycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server)
     except Exception as exception:
         await ycx.finish(f"错误: {exception}")
     
@@ -656,7 +674,7 @@ ycx_all = (
 )
 
 @ycx_all.handle()
-async def _(event_id: Match[int], server_name: Match[str], event: Event) -> None:
+async def _(event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
     if event_id.available:
         _event_id = event_id.result
     else:
@@ -671,7 +689,7 @@ async def _(event_id: Match[int], server_name: Match[str], event: Event) -> None
         _server = None
     
     try:
-        response = await search_ycx_all(event.get_user_id(), _server, _event_id)
+        response = await search_ycx_all(_get_platform(bot), event.get_user_id(), _server, _event_id)
     except Exception as exception:
         await ycx_all.finish(f"错误: {exception}")
     
@@ -693,7 +711,7 @@ lsycx = (
 )
 
 @lsycx.handle()
-async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], event: Event) -> None:
+async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
     if not tier.available:
         await lsycx.finish("请输入排名")
     
@@ -711,7 +729,7 @@ async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], eve
         _server = None
     
     try:
-        response = await search_lsycx(event.get_user_id(), tier.result, _event_id, _server)
+        response = await search_lsycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server)
     except Exception as exception:
         await lsycx.finish(f"错误: {exception}")
     
@@ -731,7 +749,7 @@ gacha_simulate = (
 )
 
 @gacha_simulate.handle()
-async def _(times: Match[int], gacha_id: Match[int], event: Event) -> None:
+async def _(times: Match[int], gacha_id: Match[int], bot: Bot, event: Event) -> None:
     if times.available:
         _times = times.result
     else:
@@ -743,7 +761,7 @@ async def _(times: Match[int], gacha_id: Match[int], event: Event) -> None:
         _gacha_id = None
     
     try:
-        response = await simulate_gacha(event.get_user_id(), _times, _gacha_id)
+        response = await simulate_gacha(_get_platform(bot), event.get_user_id(), _times, _gacha_id)
     except Exception as exception:
         await gacha_simulate.finish(f"错误: {exception}")
     
