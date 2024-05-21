@@ -1,34 +1,8 @@
+from typing import List
+
 from tsugu_api_core._typing import _ServerId, _ServerName
 
-_COMMAND_KEYWORDS = [
-    '查询玩家',
-    '查卡面',
-    '查玩家',
-    '查卡',
-    '查角色',
-    '查活动',
-    '查分数表',
-    '查询分数榜',
-    '查分数榜',
-    '查曲',
-    '查谱面',
-    '查卡池',
-    '查询分数表',
-    'ycx',
-    'ycxall',
-    'lsycx',
-    '抽卡模拟',
-    '绑定玩家',
-    '解除绑定',
-    '主服务器',
-    '设置默认服务器',
-    '玩家状态',
-    '开启车牌转发',
-    '关闭车牌转发'
-]
-COMMAND_KEYWORDS = sorted(_COMMAND_KEYWORDS, key=lambda x: len(x), reverse=True)
-
-tier_lists = {
+TIER_LISTS = {
     "jp": [20, 30, 40, 50, 100, 200, 300, 400, 500, 1000, 2000, 5000, 10000, 20000, 30000, 50000],
     "tw": [100, 500],
     "en": [50, 100, 300, 500, 1000, 2000, 2500],
@@ -37,10 +11,10 @@ tier_lists = {
 }
 
 def tier_list_of_server_to_string() -> str:
-    result: str = ""
-    for server, tiers in tier_lists.items():
-        result += server + " : " + ", ".join(str(tier) for tier in tiers) + "\n"
-    return result
+    results: List[str] = []
+    for server, tiers in TIER_LISTS.items():
+        results.append(server + " : " + ", ".join(str(tier) for tier in tiers))
+    return "\n".join(results)
 
 USAGES = {
     "开启车牌转发": "开启车牌转发",

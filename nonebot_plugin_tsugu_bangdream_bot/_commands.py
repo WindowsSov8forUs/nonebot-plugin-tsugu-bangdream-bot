@@ -1,5 +1,5 @@
 from base64 import b64decode
-from typing import List, Tuple, Union, Optional, Sequence
+from typing import List, Tuple, Union, Optional
 
 from nonebot import logger
 
