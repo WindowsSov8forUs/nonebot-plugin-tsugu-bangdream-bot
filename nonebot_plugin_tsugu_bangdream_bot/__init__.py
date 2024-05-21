@@ -9,7 +9,7 @@ from nonebot.plugin import PluginMetadata, require, inherit_supported_adapters
 require("nonebot_plugin_alconna")
 
 from nonebot.typing import T_State
-from nonebot_plugin_alconna import load_builtin_plugin
+from nonebot_plugin_alconna import Alconna, load_builtin_plugin
 from nonebot_plugin_alconna import Command, Arparma, Extension, store_true
 from nonebot_plugin_alconna.uniseg import At, Text, Image, Reply, Segment, UniMessage
 
@@ -49,16 +49,30 @@ from ._commands import (
 )
 
 import tsugu_api_async
-from tsugu_api_core._typing import _ServerId, _TsuguUser
+from tsugu_api_core._typing import _ServerId
 
-class NoSpaceExtension(Extension):
+config = get_plugin_config(Config)
+
+__plugin_meta__ = PluginMetadata(
+    name="nonebot-plugin-tsugu-bangdream-bot",
+    description="Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现",
+    usage="\n".join([f"{key}: {value}" for key, value in USAGES.items()]),
+    type="application",
+    homepage="https://github.com/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot",
+    config=Config,
+    supported_adapters=inherit_supported_adapters(
+        "nonebot_plugin_alconna", "nonebot_plugin_userinfo"
+    )
+)
+
+class TsuguExtension(Extension):
     @property
     def priority(self) -> int:
         return 10
     
     @property
     def id(self) -> str:
-        return "TsuguNoSpaceExtension"
+        return "TsuguExtension"
     
     def __init__(self, reply: bool, at: bool, no_space: bool) -> None:
         self.reply = reply
@@ -84,6 +98,18 @@ class NoSpaceExtension(Extension):
         else:
             return msg
     
+    async def permission_check(self, bot: Bot, event: Event, command: Alconna) -> bool:
+        # 规避机器人自身的消息
+        try:
+            user_id = event.get_user_id()
+        except:
+            return True
+        
+        if user_id == bot.self_id:
+            return False
+        
+        return True
+    
     async def send_wrapper(self, bot: Bot, event: Event, send: Union[str, Message, UniMessage]) -> Union[str, Message, UniMessage]:
         if not self.reply and not self.at:
             return send
@@ -100,20 +126,6 @@ class NoSpaceExtension(Extension):
             except:
                 pass
         return send
-
-config = get_plugin_config(Config)
-
-__plugin_meta__ = PluginMetadata(
-    name="nonebot-plugin-tsugu-bangdream-bot",
-    description="Koishi-Plugin-Tsugu-BanGDream-Bot 的 NoneBot2 实现",
-    usage="\n".join([f"{key}: {value}" for key, value in USAGES.items()]),
-    type="application",
-    homepage="https://github.com/WindowsSov8forUs/nonebot-plugin-tsugu-bangdream-bot",
-    config=Config,
-    supported_adapters=inherit_supported_adapters(
-        "nonebot_plugin_alconna", "nonebot_plugin_userinfo"
-    )
-)
 
 if "httpx" in get_driver().type:
     tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
@@ -133,7 +145,7 @@ tsugu_api_async.settings.backend_proxy = config.tsugu_backend_proxy
 tsugu_api_async.settings.userdata_backend_proxy = config.tsugu_data_backend_proxy
 tsugu_api_async.settings.timeout = config.tsugu_timeout
 
-extension = NoSpaceExtension(config.tsugu_reply, config.tsugu_at, config.tsugu_no_space)
+extension = TsuguExtension(config.tsugu_reply, config.tsugu_at, config.tsugu_no_space)
 
 car_forwarding = on_regex(r"(^(\d{5,6})(.*)$)")
 
