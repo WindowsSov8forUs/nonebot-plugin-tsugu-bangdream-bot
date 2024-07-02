@@ -49,7 +49,7 @@ from ._commands import (
 import tsugu_api_async
 from tsugu_api_core._typing import _ServerId
 
-config = get_plugin_config(Config)
+_config = get_plugin_config(Config)
 
 __plugin_meta__ = PluginMetadata(
     name="nonebot-plugin-tsugu-bangdream-bot",
@@ -110,21 +110,21 @@ if "httpx" in get_driver().type:
 elif "aiohttp" in get_driver().type:
     tsugu_api_async.settings.client = tsugu_api_async.settings.Client.AIO_HTTP
 
-tsugu_api_async.settings.use_easy_bg = config.tsugu_use_easy_bg
-tsugu_api_async.settings.compress = config.tsugu_compress
+tsugu_api_async.settings.use_easy_bg = _config.tsugu_use_easy_bg
+tsugu_api_async.settings.compress = _config.tsugu_compress
 
-if len(config.tsugu_backend_url) > 0:
-    tsugu_api_async.settings.backend_url = config.tsugu_backend_url
-if len(config.tsugu_data_backend_url) > 0:
-    tsugu_api_async.settings.userdata_backend_url = config.tsugu_data_backend_url
+if len(_config.tsugu_backend_url) > 0:
+    tsugu_api_async.settings.backend_url = _config.tsugu_backend_url
+if len(_config.tsugu_data_backend_url) > 0:
+    tsugu_api_async.settings.userdata_backend_url = _config.tsugu_data_backend_url
 
-tsugu_api_async.settings.proxy = config.tsugu_proxy
-tsugu_api_async.settings.backend_proxy = config.tsugu_backend_proxy
-tsugu_api_async.settings.userdata_backend_proxy = config.tsugu_data_backend_proxy
-tsugu_api_async.settings.timeout = config.tsugu_timeout
+tsugu_api_async.settings.proxy = _config.tsugu_proxy
+tsugu_api_async.settings.backend_proxy = _config.tsugu_backend_proxy
+tsugu_api_async.settings.userdata_backend_proxy = _config.tsugu_data_backend_proxy
+tsugu_api_async.settings.timeout = _config.tsugu_timeout
 
-extension = TsuguExtension(config.tsugu_reply, config.tsugu_at)
-meta = CommandMeta(compact=config.tsugu_no_space)
+extension = TsuguExtension(_config.tsugu_reply, _config.tsugu_at)
+meta = CommandMeta(compact=_config.tsugu_no_space)
 
 def _get_platform(bot: Bot) -> str:
     adapter_name = bot.adapter.get_name().lower()
@@ -169,7 +169,7 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
             "red",
             user_info.user_id if user_info is not None else event.get_user_id(),
             user_info.user_name if user_info is not None else event.get_user_id(),
-            config.tsugu_bandori_station_token
+            _config.tsugu_bandori_station_token
         )
     except Exception as exception:
         logger.warning(f"Failed to submit room number: {exception}")
@@ -178,14 +178,14 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
     if is_forwarded:
         logger.debug(f"Submitted room number: {group[0]}")
 
-open_forward = Command("开启车牌转发", "开启车牌转发", meta=meta).build(auto_send_output=True, aliases=config.tsugu_open_forward_aliases, extensions=[extension], use_cmd_start=True)
+open_forward = Command("开启车牌转发", "开启车牌转发", meta=meta).build(auto_send_output=True, aliases=_config.tsugu_open_forward_aliases, extensions=[extension], use_cmd_start=True)
 
 @open_forward.handle()
 async def _(bot: Bot, event: Event) -> None:
     user_id = event.get_user_id()
     await open_forward.send(await switch_forward(_get_platform(bot), user_id, True))
 
-close_forward = Command("关闭车牌转发", "关闭车牌转发", meta=meta).build(auto_send_output=True, aliases=config.tsugu_close_forward_aliases, extensions=[extension], use_cmd_start=True)
+close_forward = Command("关闭车牌转发", "关闭车牌转发", meta=meta).build(auto_send_output=True, aliases=_config.tsugu_close_forward_aliases, extensions=[extension], use_cmd_start=True)
 
 @close_forward.handle()
 async def _(bot: Bot, event: Event) -> None:
@@ -195,7 +195,7 @@ async def _(bot: Bot, event: Event) -> None:
 bind_player = (
     Command("绑定玩家 [server_name:str]", "绑定玩家信息", meta=meta)
     .usage('开始玩家数据绑定流程，请不要在"绑定玩家"指令后添加玩家ID。省略服务器名时，默认为绑定到你当前的主服务器。请在获得临时验证数字后，将玩家签名改为该数字，并回复你的玩家ID')
-    .build(auto_send_output=True, aliases=config.tsugu_bind_player_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_bind_player_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @bind_player.handle()
@@ -231,7 +231,7 @@ async def _(bot: Bot, event: Event, player_id: str = ArgPlainText()) -> None:
 unbind_player = (
     Command("解除绑定 [server_name:str]", "解除当前服务器的玩家绑定", meta=meta).alias("解绑玩家")
     .usage("解除指定服务器的玩家数据绑定。省略服务器名时，默认为当前的主服务器")
-    .build(auto_send_output=True, aliases=config.tsugu_unbind_player_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_unbind_player_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @unbind_player.handle()
@@ -272,7 +272,7 @@ main_server = (
     .example("主服务器 cn : 将国服设置为主服务器")
     .example("日服模式 : 将日服设置为主服务器")
     .shortcut(r"(.+服)模式$", {"args": ["{0}"], "prefix": True})
-    .build(auto_send_output=True, aliases=config.tsugu_main_server_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_main_server_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @main_server.handle()
@@ -291,7 +291,7 @@ default_servers = (
     .alias("默认服务器")
     .usage("使用空格分隔服务器列表")
     .example("设置默认服务器 国服 日服 : 将国服设置为第一服务器，日服设置为第二服务器")
-    .build(auto_send_output=True, aliases=config.tsugu_default_servers_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_default_servers_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @default_servers.handle()
@@ -316,7 +316,7 @@ async def _(server_list: List[str], bot: Bot, event: Event) -> None:
 player_status = (
     Command("玩家状态 [server_name:str]", "查询自己的玩家状态", meta=meta)
     .shortcut(r"^(.+服)玩家状态$", {"args": ["{0}"]})
-    .build(auto_send_output=True, aliases=config.tsugu_player_status_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_player_status_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @player_status.handle()
@@ -344,7 +344,7 @@ ycm = (
     .alias("有车吗").alias("车来")
     .usage("获取所有车牌车牌，可以通过关键词过滤")
     .example("ycm : 获取所有车牌").example('ycm 大分: 获取所有车牌，其中包含"大分"关键词的车牌')
-    .build(auto_send_output=True, aliases=config.tsugu_ycm_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_ycm_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @ycm.handle()
@@ -374,7 +374,7 @@ player_search = (
     .usage("查询指定ID玩家的信息。省略服务器名时，默认从你当前的主服务器查询")
     .example("查玩家 10000000 : 查询你当前默认服务器中，玩家ID为10000000的玩家信息")
     .example("查玩家 40474621 jp : 查询日服玩家ID为40474621的玩家信息")
-    .build(auto_send_output=True, aliases=config.tsugu_search_player_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_player_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @player_search.handle()
@@ -405,7 +405,7 @@ card_search = (
     .usage("根据关键词或卡牌ID查询卡片信息，请使用空格隔开所有参数")
     .example("查卡 1399 :返回1399号卡牌的信息")
     .example("查卡 绿 tsugu :返回所有属性为pure的羽泽鸫的卡牌列表")
-    .build(auto_send_output=True, aliases=config.tsugu_search_card_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_card_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @card_search.handle()
@@ -427,7 +427,7 @@ async def _(word: List[str], bot: Bot, event: Event) -> None:
 card_illustration = (
     Command("查卡面 <card_id:int>", "查卡面", meta=meta).alias("查卡插画").alias("查插画")
     .usage("根据卡片ID查询卡片插画").example("查卡面 1399 :返回1399号卡牌的插画")
-    .build(auto_send_output=True, aliases=config.tsugu_card_illustration_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_card_illustration_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @card_illustration.handle()
@@ -452,7 +452,7 @@ async def _(card_id: Match[int]) -> None:
 character_search = (
     Command("查角色 <word:str*>", "查角色", meta=meta).usage("根据关键词或角色ID查询角色信息")
     .example("查角色 10 :返回10号角色的信息").example("查角色 吉他 :返回所有角色模糊搜索标签中包含吉他的角色列表")
-    .build(auto_send_output=True, aliases=config.tsugu_search_character_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_character_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @character_search.handle()
@@ -474,7 +474,7 @@ async def _(word: List[str], bot: Bot, event: Event) -> None:
 event_search = (
     Command("查活动 <word:str*>", "查活动", meta=meta).usage("根据关键词或活动ID查询活动信息")
     .example("查活动 177 :返回177号活动的信息").example("查活动 绿 tsugu :返回所有属性加成为pure，且活动加成角色中包括羽泽鸫的活动列表")
-    .build(auto_send_output=True, aliases=config.tsugu_search_event_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_event_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @event_search.handle()
@@ -496,7 +496,7 @@ async def _(word: List[str], bot: Bot, event: Event) -> None:
 song_search = (
     Command("查曲 <word:str*>", "查曲", meta=meta).usage("根据关键词或曲目ID查询曲目信息")
     .example("查曲 1 :返回1号曲的信息").example("查曲 ag lv27 :返回所有难度为27的ag曲列表")
-    .build(auto_send_output=True, aliases=config.tsugu_search_song_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_song_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @song_search.handle()
@@ -518,7 +518,7 @@ async def _(word: List[str], bot: Bot, event: Event) -> None:
 chart_search = (
     Command("查谱面 <song_id:int> [difficulty:str]", "查谱面", meta=meta).usage("根据曲目ID与难度查询谱面信息")
     .example("查谱面 1 :返回1号曲的所有谱面").example("查谱面 1 expert :返回1号曲的expert难度谱面")
-    .build(auto_send_output=True, aliases=config.tsugu_song_chart_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_song_chart_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @chart_search.handle()
@@ -544,7 +544,7 @@ meta_search = (
     Command("查询分数表 <word:str>", "查询分数表", meta=meta).usage("查询指定服务器的歌曲分数表，如果没有服务器名的话，服务器为用户的默认服务器")
     .alias("查分数表").alias("查询分数榜").alias("查分数榜")
     .example("查询分数表 cn :返回国服的歌曲分数表")
-    .build(auto_send_output=True, aliases=config.tsugu_song_meta_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_song_meta_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @meta_search.handle()
@@ -578,7 +578,7 @@ stage_search = (
     .example("查试炼 -m :返回当前活动的试炼信息，包含歌曲meta")
     .example("查试炼 :返回当前活动的试炼信息")
     .option("meta", "-m", False, store_true)
-    .build(auto_send_output=True, aliases=config.tsugu_event_stage_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_event_stage_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @stage_search.handle()
@@ -604,7 +604,7 @@ async def _(event_id: Match[int], bot: Bot, event: Event, meta: Query[bool]=Quer
 
 gacha_search = (
     Command("查卡池 <gacha_id:int>", "查卡池", meta=meta).usage("根据卡池ID查询卡池信息")
-    .build(auto_send_output=True, aliases=config.tsugu_search_gacha_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_search_gacha_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @gacha_search.handle()
@@ -631,7 +631,7 @@ ycx = (
     .usage(f"查询指定档位的预测线，如果没有服务器名的话，服务器为用户的默认服务器。如果没有活动ID的话，活动为当前活动\n可用档线:\n{tier_list_of_server_to_string()}")
     .example("ycx 1000 :返回默认服务器当前活动1000档位的档线与预测线")
     .example("ycx 1000 177 jp:返回日服177号活动1000档位的档线与预测线")
-    .build(auto_send_output=True, aliases=config.tsugu_ycx_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_ycx_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @ycx.handle()
@@ -670,7 +670,7 @@ ycx_all = (
     Command("ycxall [event_id:int] [server_name:str]", "查询所有档位的预测线", meta=meta)
     .usage(f"查询所有档位的预测线，如果没有服务器名的话，服务器为用户的默认服务器。如果没有活动ID的话，活动为当前活动\n可用档线:\n{tier_list_of_server_to_string()}")
     .alias("myycx")
-    .build(auto_send_output=True, aliases=config.tsugu_ycx_all_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_ycx_all_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @ycx_all.handle()
@@ -707,7 +707,7 @@ lsycx = (
     .usage(f"查询指定档位的预测线，与最近的4期活动类型相同的活动的档线数据，如果没有服务器名的话，服务器为用户的默认服务器。如果没有活动ID的话，活动为当前活动\n可用档线:\n{tier_list_of_server_to_string()}")
     .example("lsycx 1000 :返回默认服务器当前活动的档线与预测线，与最近的4期活动类型相同的活动的档线数据")
     .example("lsycx 1000 177 jp:返回日服177号活动1000档位档线与最近的4期活动类型相同的活动的档线数据")
-    .build(auto_send_output=True, aliases=config.tsugu_lsycx_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_lsycx_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @lsycx.handle()
@@ -745,7 +745,7 @@ async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot
 gacha_simulate = (
     Command("抽卡模拟 [times:int] [gacha_id:int]", meta=meta).usage("模拟抽卡，如果没有卡池ID的话，卡池为当前活动的卡池")
     .example("抽卡模拟:模拟抽卡10次").example("抽卡模拟 300 922 :模拟抽卡300次，卡池为922号卡池")
-    .build(auto_send_output=True, aliases=config.tsugu_gacha_simulate_aliases, extensions=[extension], use_cmd_start=True)
+    .build(auto_send_output=True, aliases=_config.tsugu_gacha_simulate_aliases, extensions=[extension], use_cmd_start=True)
 )
 
 @gacha_simulate.handle()
