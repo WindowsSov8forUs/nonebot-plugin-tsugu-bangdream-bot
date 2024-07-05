@@ -96,6 +96,8 @@ class Config(BaseModel):
     tsugu_main_server_aliases: Set[str] = set()
     tsugu_default_servers_aliases: Set[str] = set()
     tsugu_player_status_aliases: Set[str] = set()
+    tsugu_player_list_aliases: Set[str] = set()
+    tsugu_switch_index_aliases: Set[str] = set()
     tsugu_ycm_aliases: Set[str] = set()
     tsugu_search_player_aliases: Set[str] = set()
     tsugu_search_card_aliases: Set[str] = set()

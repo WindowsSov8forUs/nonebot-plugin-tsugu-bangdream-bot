@@ -8,8 +8,8 @@ from nonebot.plugin import PluginMetadata, require, inherit_supported_adapters
 
 require("nonebot_plugin_alconna")
 
-from nonebot_plugin_alconna.uniseg import At, Text, Image, Reply, Segment, UniMessage
 from nonebot_plugin_alconna import Args, Match, Query, Arparma
+from nonebot_plugin_alconna.uniseg import At, Reply, UniMessage
 from nonebot_plugin_alconna import (
     Field,
     Alconna,
@@ -50,14 +50,20 @@ from ._commands import (
     switch_forward,
     search_ycx_all,
     _get_tsugu_user,
+    get_player_list,
     search_character,
     switch_main_server,
     set_default_servers,
-    get_card_illustration
+    switch_player_index,
+    get_card_illustration,
+    server_id_to_full_name,
+    server_name_fuzzy_search,
+    difficulty_id_fuzzy_search
 )
 
 import tsugu_api_async
 from tsugu_api_core._typing import _ServerId
+from tsugu_api_core.exception import FailedException
 
 _config = get_plugin_config(Config)
 
@@ -72,48 +78,6 @@ __plugin_meta__ = PluginMetadata(
         "nonebot_plugin_alconna", "nonebot_plugin_userinfo"
     )
 )
-
-class TsuguExtension(Extension):
-    @property
-    def priority(self) -> int:
-        return 10
-    
-    @property
-    def id(self) -> str:
-        return "TsuguExtension"
-    
-    def __init__(self, reply: bool, at: bool) -> None:
-        self.reply = reply
-        self.at = at
-    
-    async def permission_check(self, bot: Bot, event: Event, command: Alconna) -> bool:
-        # 规避机器人自身的消息
-        try:
-            user_id = event.get_user_id()
-        except:
-            return True
-        
-        if user_id == bot.self_id:
-            return False
-        
-        return True
-    
-    async def send_wrapper(self, bot: Bot, event: Event, send: Union[str, Message, UniMessage]) -> Union[str, Message, UniMessage]:
-        if not self.reply and not self.at:
-            return send
-        if self.at:
-            try:
-                user_id = event.get_user_id()
-                send = At('user', target=user_id) + " " + send
-            except:
-                pass
-        if self.reply:
-            try:
-                message_id = UniMessage.get_message_id(event, bot)
-                send = Reply(message_id) + send
-            except:
-                pass
-        return send
 
 if "httpx" in get_driver().type:
     tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
@@ -133,19 +97,59 @@ tsugu_api_async.settings.backend_proxy = _config.tsugu_backend_proxy
 tsugu_api_async.settings.userdata_backend_proxy = _config.tsugu_data_backend_proxy
 tsugu_api_async.settings.timeout = _config.tsugu_timeout
 
+class TsuguExtension(Extension):
+    @property
+    def priority(self) -> int:
+        return 10
+
+    @property
+    def id(self) -> str:
+        return "TsuguExtension"
+
+    def __init__(self, reply: bool, at: bool) -> None:
+        self.reply = reply
+        self.at = at
+
+    async def permission_check(self, bot: Bot, event: Event, command: Alconna) -> bool:
+        # 规避机器人自身的消息
+        try:
+            user_id = event.get_user_id()
+        except:
+            return True
+        
+        if user_id == bot.self_id:
+            return False
+        
+        return True
+
+    async def send_wrapper(self, bot: Bot, event: Event, send: Union[str, Message, UniMessage]) -> Union[str, Message, UniMessage]:
+        if not self.reply and not self.at:
+            return send
+        if self.at:
+            try:
+                user_id = event.get_user_id()
+                send = At('user', target=user_id) + " " + send
+            except:
+                pass
+        if self.reply:
+            try:
+                message_id = UniMessage.get_message_id(event, bot)
+                send = Reply(message_id) + send
+            except:
+                pass
+        return send
+
 extension = TsuguExtension(_config.tsugu_reply, _config.tsugu_at)
 meta = CommandMeta(compact=_config.tsugu_no_space)
 
 def _get_platform(bot: Bot) -> str:
     adapter_name = bot.adapter.get_name().lower()
-    print(adapter_name)
     if adapter_name.startswith("onebot"):
         return "onebot"
     elif adapter_name == "satori":
         try:
             from nonebot.adapters.satori import Bot as SatoriBot
             if isinstance(bot, SatoriBot):
-                print(bot.platform)
                 return bot.platform
             else:
                 return "satori"
@@ -163,11 +167,11 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
     try:
         tsugu_user = await _get_tsugu_user(_get_platform(bot), event.get_user_id())
     except Exception as exception:
-        logger.warning(f"Failed to get user data: {exception}")
+        logger.warning(f"Failed to get user data: '{exception}'")
         car_forwarding.skip()
     
     if isinstance(tsugu_user, str):
-        logger.warning(f"Failed to get user data: {tsugu_user}")
+        logger.warning(f"Failed to get user data: '{tsugu_user}'")
         car_forwarding.skip()
     
     try:
@@ -181,11 +185,11 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
             _config.tsugu_bandori_station_token
         )
     except Exception as exception:
-        logger.warning(f"Failed to submit room number: {exception}")
+        logger.warning(f"Failed to submit room number: '{exception}'")
         car_forwarding.skip()
     
     if is_forwarded:
-        logger.debug(f"Submitted room number: {group[0]}")
+        logger.debug(f"Submitted room number: '{group[0]}'")
 
 # 统一的命令 build 方法
 def _build(cmd: Command, aliases: Set[str]) -> Type[AlconnaMatcher]:
@@ -223,17 +227,22 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await bind_player.finish("错误: 服务器不存在，请不要在参数中添加玩家ID")
+                try:
+                    _server = await server_name_fuzzy_search(server_name.result)
+                except ValueError:
+                    await bind_player.finish("错误: 服务器名未能匹配任何服务器")
         else:
-            _server = None
+            try:
+                tsugu_user = await _get_tsugu_user(_get_platform(bot), event.get_user_id())
+            except FailedException as exception:
+                return await bind_player.finish(exception.response["data"])
+            except Exception as exception:
+                return await bind_player.finish(f"错误: {exception}")
+            
+            _server = tsugu_user["mainServer"]
+    
         
-        reply, available, server = await player_bind(_get_platform(bot), event.get_user_id(), _server)
-        
-        if not available:
-            await bind_player.finish(reply)
-        else:
-            bind_player.set_path_arg("verify_server", server)
-            await bind_player.send(reply)
+        return await player_bind(bind_player, _get_platform(bot), event.get_user_id(), _server)
 
     @bind_player.got("player_id")
     async def _(bot: Bot, event: Event, player_id: str = ArgPlainText()) -> None:
@@ -241,11 +250,17 @@ with namespace("tsugu") as tsugu_namespace:
             await bind_player.finish("错误: 无效的玩家id")
         
         server = bind_player.get_path_arg("verify_server", None)
-        assert server is not None
+        assert server is not None # 理论上不会被触发
+
+        try:
+            response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), "bind")
+        except FailedException as exception:
+            return await bind_player.finish(exception.response["data"])
+
+        await bind_player.send(f"绑定 {server_id_to_full_name(server)} 玩家 {player_id} 成功，正在生成玩家状态图片")
         
-        response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), True)
-        
-        await bind_player.finish(response["data"])
+        message = await search_player(_get_platform(bot), event.get_user_id(), int(player_id), server)
+        return await bind_player.finish(message)
 
     @(unbind_player := _build(
         Command("解除绑定 [server_name:str]", "解除当前服务器的玩家绑定", meta=meta)
@@ -258,18 +273,22 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await unbind_player.finish("错误: 服务器不存在，请不要在参数中添加玩家ID")
+                try:
+                    _server = await server_name_fuzzy_search(server_name.result)
+                except ValueError:
+                    await bind_player.finish("错误: 服务器名未能匹配任何服务器")
         else:
-            _server = None
+            try:
+                tsugu_user = await _get_tsugu_user(_get_platform(bot), event.get_user_id())
+            except FailedException as exception:
+                return await bind_player.finish(exception.response["data"])
+            except Exception as exception:
+                return await bind_player.finish(f"错误: {exception}")
+            
+            _server = tsugu_user["mainServer"]
+    
         
-        reply, available, server, player_id = await player_unbind(_get_platform(bot), event.get_user_id(), _server)
-        
-        if not available:
-            await unbind_player.finish(reply)
-        else:
-            unbind_player.set_path_arg("verify_server", server)
-            unbind_player.set_path_arg("player_id", player_id)
-            await unbind_player.send(reply)
+        return await player_unbind(bind_player, _get_platform(bot), event.get_user_id(), _server)
 
     @unbind_player.got("_anything")
     async def _(bot: Bot, event: Event) -> None:
@@ -279,7 +298,10 @@ with namespace("tsugu") as tsugu_namespace:
         player_id = unbind_player.get_path_arg("player_id", None)
         assert player_id is not None
         
-        response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), False)
+        try:
+            response = await tsugu_api_async.bind_player_verification(_get_platform(bot), event.get_user_id(), server, int(player_id), "unbind")
+        except FailedException as exception:
+            return await bind_player.finish(exception.response["data"])
         
         await unbind_player.finish(response["data"])
 
@@ -292,63 +314,69 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_main_server_aliases
     )).handle()
     async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
-        if server_name.available:
+        try:
+            _server = server_name_to_id(server_name.result)
+        except ValueError:
             try:
-                _server = server_name_to_id(server_name.result)
+                _server = await server_name_fuzzy_search(server_name.result)
             except ValueError:
-                await main_server.finish("错误: 服务器不存在")
-            await main_server.finish(await switch_main_server(_get_platform(bot), event.get_user_id(), _server))
-        else:
-            await main_server.finish("错误: 未指定服务器")
+                await bind_player.finish("错误: 服务器名未能匹配任何服务器")
+        await main_server.finish(await switch_main_server(_get_platform(bot), event.get_user_id(), _server))
 
-    @(default_servers := _build(
-        Command("设置默认服务器 <server_list:str*>", "设定信息显示中的默认服务器排序", meta=meta)
-        .alias("默认服务器")
+    @(display_servers := _build(
+        Command("设置显示服务器 <server_list:str*>", "设定信息显示中的默认服务器排序", meta=meta)
+        .alias("默认服务器").alias("设置默认服务器")
         .usage("使用空格分隔服务器列表")
         .example("设置默认服务器 国服 日服 : 将国服设置为第一服务器，日服设置为第二服务器"),
         aliases=_config.tsugu_default_servers_aliases
     )).handle()
     async def _(server_list: List[str], bot: Bot, event: Event) -> None:
-        if len(server_list) > 0:
-            servers: List[_ServerId] = []
-            for _server in server_list:
-                try:
-                    _id = server_name_to_id(_server)
-                except ValueError:
-                    await default_servers.finish("错误: 指定了不存在的服务器")
-                if _id in servers:
-                    await default_servers.finish("错误: 指定了重复的服务器")
-                servers.append(_id)
-            if len(servers) < 1:
-                await default_servers.finish("错误: 请指定至少一个服务器")
-            
-            await default_servers.finish(await set_default_servers(_get_platform(bot), event.get_user_id(), servers))
-        else:
-            await default_servers.finish("错误: 请指定至少一个服务器")
+        servers: List[_ServerId] = []
+        for _server in server_list:
+            try:
+                _id = server_name_to_id(_server)
+            except ValueError:
+                await display_servers.finish("错误: 指定了不存在的服务器")
+            if _id in servers:
+                await display_servers.finish("错误: 指定了重复的服务器")
+            servers.append(_id)
+        if len(servers) < 1:
+            await display_servers.finish("错误: 请指定至少一个服务器")
+        
+        await display_servers.finish(await set_default_servers(_get_platform(bot), event.get_user_id(), servers))
 
     @(player_status := _build(
-        Command("玩家状态 [server_name:str]", "查询自己的玩家状态", meta=meta)
-        .shortcut(r"^(.+服)玩家状态$", {"args": ["{0}"]}),
+        Command("玩家状态 [index:int]", "查询自己的玩家状态", meta=meta)
+        .shortcut(r"(.+服)玩家状态$", {"args": ["{0}"]}),
         _config.tsugu_player_status_aliases
     )).handle()
-    async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
-        if server_name.available:
-            try:
-                _server = server_name_to_id(server_name.result)
-            except ValueError:
-                await player_status.finish("错误: 服务器不存在")
+    async def _(index: Match[int], bot: Bot, event: Event) -> None:
+        if index.available:
+            _index = index.result
         else:
-            _server = None
+            _index = None
         
-        result = await player_info(_get_platform(bot), event.get_user_id(), _server)
-        segments: List[Segment] = []
-        for _r in result:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await player_status.finish(UniMessage(segments))
+        await player_status.finish(await player_info(_get_platform(bot), event.get_user_id(), _index))
+
+    @(player_list := _build(
+        Command("玩家状态列表", "查询目前已经绑定的所有玩家信息")
+        .alias("玩家列表").alias("玩家信息列表"),
+        _config.tsugu_player_list_aliases
+    )).handle()
+    async def _(bot: Bot, event: Event) -> None:
+        return await player_list.finish(await get_player_list(_get_platform(bot), event.get_user_id()))
+
+    @(switch_index := _build(
+        Command("玩家默认ID <index:int>", "设置默认显示的玩家ID")
+        .usage(
+            "调整玩家状态指令，和发送车牌时的默认玩家信息。\n"
+            "规则: \n如果该ID对应的玩家信息在当前默认服务器中, 显示。\n"
+            "如果不在当前默认服务器中, 显示当前默认服务器的编号最靠前的玩家信息"
+        ).alias("默认玩家ID").alias("默认玩家").alias("玩家ID"),
+        _config.tsugu_switch_index_aliases
+    )).handle()
+    async def _(index: Match[int], bot: Bot, event: Event) -> None:
+        return await switch_index.finish(await switch_player_index(_get_platform(bot), event.get_user_id(), index.result))
 
     @(ycm := _build(
         Command("ycm <keyword:str*>", "获取车牌", meta=meta)
@@ -363,19 +391,7 @@ with namespace("tsugu") as tsugu_namespace:
         else:
             _keyword = None
         
-        try:
-            response = await room_list(_keyword)
-        except Exception as exception:
-            await ycm.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await ycm.finish(UniMessage(segments))
+        await ycm.finish(await room_list(_keyword))
 
     @(player_search := _build(
         Command("查玩家 <player_id:int> [server_name:str]", "查询玩家信息", meta=meta)
@@ -392,19 +408,11 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await player_search.finish("错误: 服务器不存在")
+                await player_search.finish("错误: 服务器名未能匹配任何服务器")
         else:
             _server = None
-        
-        result = await search_player(_get_platform(bot), event.get_user_id(), player_id.result, _server)
-        segments: List[Segment] = []
-        for _r in result:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await player_search.finish(UniMessage(segments))
+
+        await player_search.finish(await search_player(_get_platform(bot), event.get_user_id(), player_id.result, _server))
 
     @(card_search := _build(
         Command("查卡 <word:str*>", "查卡", meta=meta).alias("查卡牌")
@@ -413,19 +421,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_search_card_aliases
     )).handle()
     async def _(word: List[str], bot: Bot, event: Event) -> None:
-        try:
-            response = await search_card(_get_platform(bot), event.get_user_id(), " ".join(word))
-        except Exception as exception:
-            await card_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await card_search.finish(UniMessage(segments))
+        await card_search.finish(await search_card(_get_platform(bot), event.get_user_id(), " ".join(word)))
 
     @(card_illustration := _build(
         Command("查卡面 <card_id:int>", "查卡面", meta=meta)
@@ -435,22 +431,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_card_illustration_aliases
     )).handle()
     async def _(card_id: Match[int]) -> None:
-        if not card_id.available:
-            await card_illustration.finish("错误: 参数错误")
-        
-        try:
-            response = await get_card_illustration(card_id.result)
-        except Exception as exception:
-            await card_illustration.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await card_illustration.finish(UniMessage(segments))
+        await card_illustration.finish(await get_card_illustration(card_id.result))
 
     @(character_search := _build(
         Command("查角色 <word:str*>", "查角色", meta=meta)
@@ -459,19 +440,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_search_character_aliases
     )).handle()
     async def _(word: List[str], bot: Bot, event: Event) -> None:
-        try:
-            response = await search_character(_get_platform(bot), event.get_user_id(), " ".join(word))
-        except Exception as exception:
-            await character_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await character_search.finish(UniMessage(segments))
+        await character_search.finish(await search_character(_get_platform(bot), event.get_user_id(), " ".join(word)))
 
     @(event_search := _build(
         Command("查活动 <word:str*>", "查活动", meta=meta)
@@ -480,19 +449,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_search_event_aliases
     )).handle()
     async def _(word: List[str], bot: Bot, event: Event) -> None:
-        try:
-            response = await search_event(_get_platform(bot), event.get_user_id(), " ".join(word))
-        except Exception as exception:
-            await event_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await event_search.finish(UniMessage(segments))
+        await event_search.finish(await search_event(_get_platform(bot), event.get_user_id(), " ".join(word)))
 
     @(song_search := _build(
         Command("查曲 <word:str*>", "查曲", meta=meta)
@@ -501,19 +458,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_search_song_aliases
     )).handle()
     async def _(word: List[str], bot: Bot, event: Event) -> None:
-        try:
-            response = await search_song(_get_platform(bot), event.get_user_id(), " ".join(word))
-        except Exception as exception:
-            await song_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await song_search.finish(UniMessage(segments))
+        await song_search.finish(await search_song(_get_platform(bot), event.get_user_id(), " ".join(word)))
 
     @(chart_search := _build(
         Command("查谱面 <song_id:int> [difficulty:str]", "查谱面", meta=meta)
@@ -522,52 +467,30 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_song_chart_aliases
     )).handle()
     async def _(song_id: Match[int], bot: Bot, event: Event, difficulty: str = "expert") -> None:
-        if not song_id.available:
-            await chart_search.finish("错误: 未指定曲目ID")
-        
         try:
-            response = await song_chart(_get_platform(bot), event.get_user_id(), song_id.result, difficulty) # type: ignore
-        except Exception as exception:
-            await chart_search.finish(f"错误: {exception}")
+            difficulty_id = await difficulty_id_fuzzy_search(difficulty)
+        except ValueError:
+            await chart_search.finish("错误: 难度名未能匹配任何难度")
         
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await chart_search.finish(UniMessage(segments))
+        await chart_search.finish(await song_chart(_get_platform(bot), event.get_user_id(), song_id.result, difficulty_id))
 
     @(meta_search := _build(
-        Command("查询分数表 <word:str>", "查询分数表", meta=meta)
+        Command("查询分数表 <server_name:str>", "查询分数表", meta=meta)
         .usage("查询指定服务器的歌曲分数表，如果没有服务器名的话，服务器为用户的默认服务器")
         .alias("查分数表").alias("查询分数榜").alias("查分数榜")
         .example("查询分数表 cn :返回国服的歌曲分数表"),
         _config.tsugu_song_meta_aliases
     )).handle()
-    async def _(word: Match[str], bot: Bot, event: Event) -> None:
-        if word.available:
-            try:
-                _server = server_name_to_id(word.result)
-            except ValueError:
-                await meta_search.finish("错误: 服务器不存在")
-        else:
-            _server = None
-        
+    async def _(server_name: Match[str], bot: Bot, event: Event) -> None:
         try:
-            response = await song_meta(_get_platform(bot), event.get_user_id(), _server)
-        except Exception as exception:
-            await meta_search.finish(f"错误: {exception}")
+            _server = server_name_to_id(server_name.result)
+        except ValueError:
+            try:
+                _server = await server_name_fuzzy_search(server_name.result)
+            except ValueError:
+                await meta_search.finish("错误: 服务器名未能匹配任何服务器")
         
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await meta_search.finish(UniMessage(segments))
+        await meta_search.finish(await song_meta(_get_platform(bot), event.get_user_id(), _server))
 
     @(stage_search := _build(
         Command("查试炼 [event_id:int]", "查试炼", meta=meta)
@@ -584,19 +507,7 @@ with namespace("tsugu") as tsugu_namespace:
         else:
             _event_id = None
         
-        try:
-            response = await event_stage(_get_platform(bot), event.get_user_id(), _event_id, meta.result)
-        except Exception as exception:
-            await stage_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await stage_search.finish(UniMessage(segments))
+        await stage_search.finish(await event_stage(_get_platform(bot), event.get_user_id(), _event_id, meta.result))
 
     @(gacha_search := _build(
         Command("查卡池 <gacha_id:int>", "查卡池", meta=meta)
@@ -604,22 +515,7 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_search_gacha_aliases
     )).handle()
     async def _(gacha_id: Match[int], bot: Bot, event: Event) -> None:
-        if not gacha_id.available:
-            await gacha_search.finish("错误: 未指定卡池ID")
-        
-        try:
-            response = await search_gacha(_get_platform(bot), event.get_user_id(), gacha_id.result)
-        except Exception as exception:
-            await gacha_search.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await gacha_search.finish(UniMessage(segments))
+        await gacha_search.finish(await search_gacha(_get_platform(bot), event.get_user_id(), gacha_id.result))
 
     @(ycx := _build(
         Command("ycx <tier:int> [event_id:int] [server_name:str]", "查询指定档位的预测线", meta=meta)
@@ -630,9 +526,6 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_ycx_aliases
     )).handle()
     async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
-        if not tier.available:
-            await ycx.finish("请输入排名")
-        
         if event_id.available:
             _event_id = event_id.result
         else:
@@ -642,23 +535,14 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await ycx.finish("错误: 服务器不存在")
+                try:
+                    _server = await server_name_fuzzy_search(server_name.result)
+                except ValueError:
+                    await ycx.finish("错误: 服务器名未能匹配任何服务器")
         else:
             _server = None
         
-        try:
-            response = await search_ycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server)
-        except Exception as exception:
-            await ycx.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await ycx.finish(UniMessage(segments))
+        await ycx.finish(await search_ycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server))
 
     @(ycx_all := _build(
         Command("ycxall [event_id:int] [server_name:str]", "查询所有档位的预测线", meta=meta)
@@ -678,23 +562,14 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await ycx_all.finish("错误: 服务器不存在")
+                try:
+                    _server = await server_name_fuzzy_search(server_name.result)
+                except ValueError:
+                    await ycx_all.finish("错误: 服务器名未能匹配任何服务器")
         else:
             _server = None
         
-        try:
-            response = await search_ycx_all(_get_platform(bot), event.get_user_id(), _server, _event_id)
-        except Exception as exception:
-            await ycx_all.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await ycx_all.finish(UniMessage(segments))
+        await ycx_all.finish(await search_ycx_all(_get_platform(bot), event.get_user_id(), _server, _event_id))
 
     @(lsycx := _build(
         Command("lsycx <tier:int> [event_id:int] [server_name:str]", "查询指定档位的预测线", meta=meta)
@@ -705,9 +580,6 @@ with namespace("tsugu") as tsugu_namespace:
         _config.tsugu_lsycx_aliases
     )).handle()
     async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
-        if not tier.available:
-            await lsycx.finish("请输入排名")
-        
         if event_id.available:
             _event_id = event_id.result
         else:
@@ -717,23 +589,14 @@ with namespace("tsugu") as tsugu_namespace:
             try:
                 _server = server_name_to_id(server_name.result)
             except ValueError:
-                await lsycx.finish("错误: 服务器不存在")
+                try:
+                    _server = await server_name_fuzzy_search(server_name.result)
+                except ValueError:
+                    await lsycx.finish("错误: 服务器名未能匹配任何服务器")
         else:
             _server = None
         
-        try:
-            response = await search_lsycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server)
-        except Exception as exception:
-            await lsycx.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await lsycx.finish(UniMessage(segments))
+        await lsycx.finish(await search_lsycx(_get_platform(bot), event.get_user_id(), tier.result, _event_id, _server))
 
     @(gacha_simulate := _build(
         Command("抽卡模拟 [times:int] [gacha_id:int]", meta=meta)
@@ -752,19 +615,7 @@ with namespace("tsugu") as tsugu_namespace:
         else:
             _gacha_id = None
         
-        try:
-            response = await simulate_gacha(_get_platform(bot), event.get_user_id(), _times, _gacha_id)
-        except Exception as exception:
-            await gacha_simulate.finish(f"错误: {exception}")
-        
-        segments: List[Segment] = []
-        for _r in response:
-            if isinstance(_r, str):
-                segments.append(Text(_r))
-            else:
-                segments.append(Image(raw=_r))
-        
-        await gacha_simulate.finish(UniMessage(segments))
+        await gacha_simulate.finish(await simulate_gacha(_get_platform(bot), event.get_user_id(), _times, _gacha_id))
 
 # help 的内部实现，避免对其他 help 产生阻塞
 @(_help := on_alconna(

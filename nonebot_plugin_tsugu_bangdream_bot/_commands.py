@@ -1,27 +1,65 @@
 from base64 import b64decode
-from typing import List, Tuple, Union, Optional
+from typing import List, Type, Tuple, Union, Optional
 
 from nonebot import logger
 
+from nonebot_plugin_alconna import Text, Image, Segment, UniMessage, AlconnaMatcher
+
 import tsugu_api_async
-from tsugu_api_core._typing import _Server, _ServerId, _TsuguUser, _DifficultyText
+from tsugu_api_core.exception import FailedException
+from tsugu_api_core._typing import (
+    _Server,
+    _Response,
+    _ServerId,
+    _TsuguUser,
+    _DifficultyId,
+    _UserPlayerInList,
+    _FuzzySearchResult
+)
 
 from .config import CAR, FAKE
 
 from ._utils import server_id_to_full_name
 
-async def _get_tsugu_user(platform: str, user_id: str) -> Union[_TsuguUser, str]:
+def _list_to_message(response: _Response) -> UniMessage:
+    segments: List[Segment] = []
+    for _r in response:
+        if _r["type"] == "string":
+            segments.append(Text(_r["string"]))
+        else:
+            segments.append(Image(raw=b64decode(_r["string"])))
+    
+    return UniMessage(segments)
+
+async def _get_tsugu_user(platform: str, user_id: str) -> _TsuguUser:
     try:
         response = await tsugu_api_async.get_user_data(platform, user_id)
+    except FailedException as exception:
+        raise exception
     except Exception as exception:
-        return f"错误: {exception}"
+        raise Exception(f"错误: {exception}")
     
-    if response["status"] == "failed":
-        assert isinstance(response["data"], str)
-        return response["data"]
-    
-    assert isinstance(response["data"], dict)
     return response["data"]
+
+def _get_user_player_from_tsugu_user(tsugu_user: _TsuguUser, server: Optional[_ServerId]=None, index: Optional[int]=None) -> _UserPlayerInList:
+    server = server or tsugu_user["mainServer"]
+    user_player_list = tsugu_user["userPlayerList"]
+    user_player_index = index or tsugu_user["userPlayerIndex"]
+    
+    if len(user_player_list) == 0:
+        raise ValueError("用户未绑定player")
+    
+    if index is not None:
+        return user_player_list[index]
+    
+    if tsugu_user["userPlayerList"][user_player_index]["server"] == server:
+        return tsugu_user["userPlayerList"][user_player_index]
+    
+    for user_player in user_player_list:
+        if user_player["server"] == server:
+            return user_player
+    
+    raise ValueError("用户在对应服务器上未绑定player")
 
 async def forward_room(
     room_number: int,
@@ -32,7 +70,7 @@ async def forward_room(
     user_name: str,
     bandori_station_token: Optional[str]
 ) -> bool:
-    if not tsugu_user["car"]:
+    if not tsugu_user["shareRoomNumber"]:
         logger.debug("User is disabled to forward room number")
         return False
     
@@ -71,91 +109,78 @@ async def forward_room(
 
 async def switch_forward(platform: str, user_id: str, mode: bool) -> str:
     try:
-        response = await tsugu_api_async.change_user_data(
+        await tsugu_api_async.change_user_data(
             platform,
             user_id,
-            {'car': mode}
+            {"shareRoomNumber": mode}
         )
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
         return f"错误: {exception}"
     
-    if response["status"] == "failed":
-        assert "data" in response
-        return response["data"]
-    else:
-        return (
-            "已"
-            + ("开启" if mode else "关闭")
-            + "车牌转发"
-        )
-
-async def player_bind(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId]]:
-    try:
-        tsugu_user = await _get_tsugu_user(platform, user_id)
-    except Exception as exception:
-        return f"错误: {exception}", False, None
-    
-    if isinstance(tsugu_user, str):
-        return tsugu_user, False, None
-    
-    if server is None:
-        server = tsugu_user["server_mode"]
-    
-    try:
-        response = await tsugu_api_async.bind_player_request(platform, user_id, server, True)
-    except Exception as exception:
-        return f"错误: {exception}", False, None
-    
-    if response["status"] == "failed":
-        assert isinstance(response["data"], str)
-        return response["data"], False, None
-    
-    assert isinstance(response["data"], dict)
-    verify_code = response["data"]["verifyCode"]
     return (
-        f"正在绑定 {server_id_to_full_name(server)} 账号，"
+        "已"
+        + ("开启" if mode else "关闭")
+        + "车牌转发"
+    )
+
+async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: _ServerId) -> None:
+    try:
+        response = await tsugu_api_async.bind_player_request(platform, user_id)
+    except FailedException as exception:
+        return await matcher.finish(exception.response["data"])
+    except Exception as exception:
+        return await matcher.finish(f"错误: {exception}")
+    
+    verify_code = response["data"]["verifyCode"]
+    matcher.set_path_arg("verify_server", server)
+    
+    return await matcher.send(
+        f"正在绑定来自 {server_id_to_full_name(server)} 账号，"
         + "请将你的\n评论(个性签名)\n或者\n你的当前使用的卡组的卡组名(乐队编队名称)\n改为以下数字后，直接发送你的玩家id\n"
         + f"{verify_code}"
-    ), True, server
+    )
 
-async def player_unbind(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Tuple[str, bool, Optional[_ServerId], Optional[int]]:
+async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: _ServerId, index: Optional[int]=None) -> None:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
+    except FailedException as exception:
+        return await matcher.finish(exception.response["data"])
     except Exception as exception:
-        return f"错误: {exception}", False, None, None
-    
-    if isinstance(tsugu_user, str):
-        return tsugu_user, False, None, None
-    
-    if server is None:
-        server = tsugu_user["server_mode"]
-    
-    tsugu_user_server = tsugu_user["server_list"][server]
+        return await matcher.finish(f"错误: {exception}")
     
     try:
-        response = await tsugu_api_async.bind_player_request(platform, user_id, server, False)
+        player = _get_user_player_from_tsugu_user(tsugu_user, server)
     except Exception as exception:
-        return f"错误: {exception}", False, None, None
+        return await matcher.finish(str(exception))
+    player_id = player["playerId"]
     
-    if response["status"] == "failed":
-        assert isinstance(response["data"], str)
-        return response["data"], False, None, None
+    if server is None:
+        server = tsugu_user["mainServer"]
     
-    assert isinstance(response["data"], dict)
+    try:
+        response = await tsugu_api_async.bind_player_request(platform, user_id)
+    except FailedException as exception:
+        return await matcher.finish(exception.response["data"])
+    except Exception as exception:
+        return await matcher.finish(f"错误: {exception}")
+    
     verify_code = response["data"]["verifyCode"]
-    return (
-        f"正在解除绑定 {server_id_to_full_name(server)} 账号 {tsugu_user_server['playerId']} \n"
-        + f"因为使用远程服务器，解除绑定需要验证\n请将 {tsugu_user_server['playerId']} 账号的\n"
-        + "评论(个性签名)\n或者\n你的当前使用的卡组的卡组名(乐队编队名称)\n改为以下数字后，发送任意消息继续\n"
+    matcher.set_path_arg("verify_server", server)
+    matcher.set_path_arg("player_id", player_id)
+    return await matcher.send(
+        f"正在解除绑定来自 {server_id_to_full_name(server)} 账号 玩家ID: {player_id} \n"
+        + "请将你的\n评论(个性签名)\n或者\n你的当前使用的卡组的卡组名(乐队编队名称)\n改为以下数字后，发送任意消息继续\n"
         + f"{verify_code}"
-    ), True, server, tsugu_user_server["playerId"]
+    )
 
 async def switch_main_server(platform: str, user_id: str, server: _ServerId) -> str:
     try:
         response = await tsugu_api_async.change_user_data(
             platform,
             user_id,
-            {'server_mode': server}
+            {"mainServer": server}
         )
     except Exception as exception:
         return f"错误: {exception}"
@@ -173,7 +198,7 @@ async def set_default_servers(platform: str, user_id: str, servers: List[_Server
         response = await tsugu_api_async.change_user_data(
             platform,
             user_id,
-            {"default_server": servers}
+            {"displayedServerList": servers}
         )
     except Exception as exception:
         return f"错误: {exception}"
@@ -183,394 +208,359 @@ async def set_default_servers(platform: str, user_id: str, servers: List[_Server
         return response["data"]
     
     return (
-        f"成功切换默认服务器顺序: {', '.join(server_id_to_full_name(server) for server in servers)}"
+        f"成功切换默认显示服务器顺序: {', '.join(server_id_to_full_name(server) for server in servers)}"
     )
 
-async def player_info(platform: str, user_id: str, server: Optional[_ServerId]=None) -> List[Union[str, bytes]]:
+async def player_info(platform: str, user_id: str, index: Optional[int]=None) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
+    player_list = tsugu_user["userPlayerList"]
+    if len(player_list) < 1:
+        return "未绑定任何玩家"
     
-    if server is None:
-        assert isinstance(tsugu_user["server_mode"], int)
-        server = tsugu_user["server_mode"]
+    if index is None:
+        try:
+            player = _get_user_player_from_tsugu_user(tsugu_user, tsugu_user["mainServer"])
+        except Exception as exception:
+            return str(exception)
+    else:
+        if index > len(player_list) or index < 1:
+            return "错误: 无效的绑定信息ID"
+        player = player_list[index - 1]
     
-    if (user_server := tsugu_user["server_list"][server])["bindingStatus"] != 2:
-        return [f"错误: 未检测到{server_id_to_full_name(server)}的玩家数据"]
+    return await search_player(platform, user_id, player["playerId"], player["server"])
+
+async def get_player_list(platform: str, user_id: str) -> str:
+    result: str = ""
     
-    return await search_player(platform, user_id, user_server["playerId"], server)
+    try:
+        tsugu_user = await _get_tsugu_user(platform, user_id)
+    except Exception as exception:
+        return str(exception)
     
-async def search_player(platform: str, user_id: str, player_id: int, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+    player_list = tsugu_user["userPlayerList"]
+    if len(player_list) < 1:
+        result += "未绑定任何玩家\n"
+    else:
+        result += "已绑定玩家列表:\n"
+        
+        for index, player in enumerate(player_list):
+            result += f"{index + 1}. {server_id_to_full_name(player['server'])}: {player['playerId']}\n"
+        result += f"当前默认玩家绑定信息ID: {tsugu_user['userPlayerIndex'] + 1}\n"
+    
+    result += (
+        f"当前主服务器: {server_id_to_full_name(tsugu_user['mainServer'])}\n"
+        + f"默认显示服务器顺序: {', '.join(server_id_to_full_name(server) for server in tsugu_user['displayedServerList'])}\n"
+    )
+    
+    return result
+
+async def switch_player_index(platform: str, user_id: str, index: int) -> str:
+    try:
+        tsugu_user = await _get_tsugu_user(platform, user_id)
+    except Exception as exception:
+        return str(exception)
+    
+    if index > len(tsugu_user["userPlayerList"]) or index < 1:
+        return "错误: 无效的绑定信息ID"
+    
+    try:
+        await tsugu_api_async.change_user_data(
+            platform,
+            user_id,
+            {"userPlayerIndex": index - 1}
+        )
+    except FailedException as exception:
+        return exception.response["data"]
+    except Exception as exception:
+        return f"错误: {exception}"
+    
+    return f"已切换至绑定信息ID: {index}"
+
+async def search_player(platform: str, user_id: str, player_id: int, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
-            return [f"错误: {exception}"]
+            return str(exception)
         
-        if isinstance(tsugu_user, str):
-            return [tsugu_user]
-        
-        server = tsugu_user["server_mode"]
+        server = tsugu_user["mainServer"]
     
     try:
-        response = await tsugu_api_async.search_player(player_id, server)
+        return _list_to_message(await tsugu_api_async.search_player(player_id, server))
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
-    
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+        return f"错误: {exception}"
 
-async def room_list(keyword: Optional[str]=None) -> List[Union[str, bytes]]:
+async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
     try:
         _response = await tsugu_api_async.station_query_all_room()
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    if _response["status"] == "failed":
-        assert isinstance(_response["data"], str)
-        return [_response["data"]]
-    
-    assert isinstance(_response["data"], list)
     try:
         response = await tsugu_api_async.room_list(_response["data"])
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_card(platform: str, user_id: str, word: str) -> List[Union[str, bytes]]:
+async def search_card(platform: str, user_id: str, word: str) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
     
     try:
         response = await tsugu_api_async.search_card(servers, word)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def get_card_illustration(card_id: int) -> List[Union[str, bytes]]:
+async def get_card_illustration(card_id: int) -> Union[str, UniMessage]:
     try:
         response = await tsugu_api_async.get_card_illustration(card_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_character(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_character(platform: str, user_id: str, text: str) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
     
     try:
-        response = await tsugu_api_async.search_character(servers, text)
+        response = await tsugu_api_async.search_character(servers, text=text)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_event(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_event(platform: str, user_id: str, text: str) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
 
     try:
-        response = await tsugu_api_async.search_event(servers, text)
+        response = await tsugu_api_async.search_event(servers, text=text)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_song(platform: str, user_id: str, text: str) -> List[Union[str, bytes]]:
+async def search_song(platform: str, user_id: str, text: str) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
     
     try:
-        response = await tsugu_api_async.search_song(servers, text)
+        response = await tsugu_api_async.search_song(servers, text=text)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def song_chart(platform: str, user_id: str, song_id: int, difficulty_text: _DifficultyText) -> List[Union[str, bytes]]:
+async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: _DifficultyId) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
 
     try:
-        response = await tsugu_api_async.song_chart(servers, song_id, difficulty_text)
+        response = await tsugu_api_async.song_chart(servers, song_id, difficulty_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
     
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def song_meta(platform: str, user_id: str, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def song_meta(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
     if server is None:
-        server = tsugu_user["server_mode"]
+        server = tsugu_user["mainServer"]
 
     try:
         response = await tsugu_api_async.song_meta(servers, server)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def event_stage(platform: str, user_id: str, event_id: Optional[int]=None, meta: bool=False) -> List[Union[str, bytes]]:
+async def event_stage(platform: str, user_id: str, event_id: Optional[int]=None, meta: bool=False) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    server = tsugu_user["server_mode"]
+    server = tsugu_user["mainServer"]
 
     try:
         response = await tsugu_api_async.event_stage(server, event_id, meta)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_gacha(platform: str, user_id: str, gacha_id: int) -> List[Union[str, bytes]]:
+async def search_gacha(platform: str, user_id: str, gacha_id: int) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    servers = tsugu_user["default_server"]
+    servers = tsugu_user["displayedServerList"]
 
     try:
         response = await tsugu_api_async.search_gacha(servers, gacha_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
-            return [f"错误: {exception}"]
+            return str(exception)
         
-        if isinstance(tsugu_user, str):
-            return [tsugu_user]
-        
-        server = tsugu_user["server_mode"]
+        server = tsugu_user["mainServer"]
     
     try:
-        response = await tsugu_api_async.ycx(server, tier, event_id)
+        response = await tsugu_api_async.cutoff_detail(server, tier, event_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_ycx_all(platform: str, user_id: str, server: Optional[_Server]=None, event_id: Optional[int]=None) -> List[Union[str, bytes]]:
+async def search_ycx_all(platform: str, user_id: str, server: Optional[_ServerId]=None, event_id: Optional[int]=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
-            return [f"错误: {exception}"]
+            return str(exception)
         
-        if isinstance(tsugu_user, str):
-            return [tsugu_user]
-        
-        server = tsugu_user["server_mode"]
+        server = tsugu_user["mainServer"]
     
     try:
-        response = await tsugu_api_async.ycx_all(server, event_id)
+        response = await tsugu_api_async.cutoff_all(server, event_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_Server]=None) -> List[Union[str, bytes]]:
+async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
         except Exception as exception:
-            return [f"错误: {exception}"]
+            return str(exception)
         
-        if isinstance(tsugu_user, str):
-            return [tsugu_user]
-        
-        server = tsugu_user["server_mode"]
+        server = tsugu_user["mainServer"]
     
     try:
-        response = await tsugu_api_async.lsycx(server, tier, event_id)
+        response = await tsugu_api_async.cutoff_list_of_recent_event(server, tier, event_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
-    
-    return result
+    return _list_to_message(response)
 
-async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None, gacha_id: Optional[int]=None) -> List[Union[str, bytes]]:
+async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None, gacha_id: Optional[int]=None) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return str(exception)
     
-    if isinstance(tsugu_user, str):
-        return [tsugu_user]
-    
-    server = tsugu_user["server_mode"]
+    server = tsugu_user["mainServer"]
 
     try:
         response = await tsugu_api_async.gacha_simulate(server, times, gacha_id)
+    except FailedException as exception:
+        return exception.response["data"]
     except Exception as exception:
-        return [f"错误: {exception}"]
+        return f"错误: {exception}"
 
-    result: List[Union[str, bytes]] = []
-    for _r in response:
-        if _r["type"] == "string":
-            result.append(_r["string"])
-        else:
-            result.append(b64decode(_r["string"]))
+    return _list_to_message(response)
+
+async def get_fuzzy_search_result(text: str) -> _FuzzySearchResult:
+    try:
+        response = await tsugu_api_async.fuzzy_search(text)
+    except:
+        return {}
     
-    return result
+    return response["data"]
+
+async def server_name_fuzzy_search(server_name: str) -> _ServerId:
+    result = await get_fuzzy_search_result(server_name)
+    if "server" not in result or not result["server"] in (0, 1, 2, 3, 4):
+        raise ValueError("未找到服务器")
+    
+    return result["server"]
+
+async def difficulty_id_fuzzy_search(difficulty_name: str) -> _DifficultyId:
+    if difficulty_name in ("ez", "easy", "简单"):
+        return 0
+    if difficulty_name in ("nm", "normal", "普通"):
+        return 1
+    if difficulty_name in ("hd", "hard", "困难"):
+        return 2
+    if difficulty_name in ("ex", "expert", "专家"):
+        return 3
+    if difficulty_name in ("sp", "special", "特殊"):
+        return 4
+    
+    result = await get_fuzzy_search_result(difficulty_name)
+    if "difficulty" not in result or result["difficulty"][0] not in (0, 1, 2, 3, 4):
+        raise ValueError("错误: 难度名未能匹配任何难度")
+    
+    return result["difficulty"][0]
