@@ -102,6 +102,8 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 | TSUGU_MAIN_SERVER_ALIASES | 否 | `()` | 切换服务器模式指令别名 |
 | TSUGU_DEFAULT_SERVERS_ALIASES | 否 | `()` | 切换显示服务器列表指令别名 |
 | TSUGU_PLAYER_STATUS_ALIASES | 否 | `()` | 用户玩家状态指令别名 |
+| TSUGU_PLAYER_LIST_ALIASES | 否 | `()` | 用户玩家状态列表指令别名 |
+| TSUGU_SWITCH_INDEX_ALIASES | 否 | `()` | 切换默认玩家 ID 指令别名 |
 | TSUGU_YCM_ALIASES | 否 | `()` | 查询车牌指令别名 |
 | TSUGU_SEARCH_PLAYER_ALIASES | 否 | `()` | 查询玩家指令别名 |
 | TSUGU_SEARCH_CARD_ALIASES | 否 | `()` | 查卡指令别名 |
