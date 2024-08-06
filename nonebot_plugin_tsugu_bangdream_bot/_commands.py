@@ -211,7 +211,7 @@ async def set_default_servers(platform: str, user_id: str, servers: List[_Server
         f"成功切换默认显示服务器顺序: {', '.join(server_id_to_full_name(server) for server in servers)}"
     )
 
-async def player_info(platform: str, user_id: str, index: Optional[int]=None) -> Union[str, UniMessage]:
+async def player_info(platform: str, user_id: str, index: Optional[int]=None, server_name: Optional[str]=None) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
@@ -222,10 +222,21 @@ async def player_info(platform: str, user_id: str, index: Optional[int]=None) ->
         return "未绑定任何玩家"
     
     if index is None:
-        try:
-            player = _get_user_player_from_tsugu_user(tsugu_user, tsugu_user["mainServer"])
-        except Exception as exception:
-            return str(exception)
+        if server_name is None:
+            try:
+                player = _get_user_player_from_tsugu_user(tsugu_user, tsugu_user["mainServer"])
+            except Exception as exception:
+                return str(exception)
+        else:
+            try:
+                server = await server_name_fuzzy_search(server_name)
+            except ValueError as exception:
+                return str(exception)
+            
+            try:
+                player = _get_user_player_from_tsugu_user(tsugu_user, server)
+            except Exception as exception:
+                return str(exception)
     else:
         if index > len(player_list) or index < 1:
             return "错误: 无效的绑定信息ID"
@@ -542,10 +553,11 @@ async def get_fuzzy_search_result(text: str) -> _FuzzySearchResult:
 
 async def server_name_fuzzy_search(server_name: str) -> _ServerId:
     result = await get_fuzzy_search_result(server_name)
-    if "server" not in result or not result["server"] in (0, 1, 2, 3, 4):
+    result_server = result.get("server", [])
+    if len(result_server) < 1 or not result_server[0] in (0, 1, 2, 3, 4):
         raise ValueError("未找到服务器")
     
-    return result["server"]
+    return result_server[0]
 
 async def difficulty_id_fuzzy_search(difficulty_name: str) -> _DifficultyId:
     if difficulty_name in ("ez", "easy", "简单"):

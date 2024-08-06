@@ -66,6 +66,7 @@ from tsugu_api_core._typing import _ServerId
 from tsugu_api_core.exception import FailedException
 
 _config = get_plugin_config(Config)
+_command_start = get_driver().config.command_start
 
 __plugin_meta__ = PluginMetadata(
     name="nonebot-plugin-tsugu-bangdream-bot",
@@ -346,17 +347,22 @@ with namespace("tsugu") as tsugu_namespace:
         await display_servers.finish(await set_default_servers(_get_platform(bot), event.get_user_id(), servers))
 
     @(player_status := _build(
-        Command("玩家状态 [index:int]", "查询自己的玩家状态", meta=meta)
-        .shortcut(r"(.+服)玩家状态$", {"args": ["{0}"]}),
+        Command("玩家状态 [index:int] [server_name:str]", "查询自己的玩家状态", meta=meta)
+        .shortcut(r"(.+服)玩家状态$", {"args": ["{0}"], "command": f"{list(_command_start)[0]}玩家状态"}),
         _config.tsugu_player_status_aliases
     )).handle()
-    async def _(index: Match[int], bot: Bot, event: Event) -> None:
+    async def _(index: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
         if index.available:
             _index = index.result
         else:
             _index = None
+
+        if server_name.available:
+            _server_name = server_name.result
+        else:
+            _server_name = None
         
-        await player_status.finish(await player_info(_get_platform(bot), event.get_user_id(), _index))
+        await player_status.finish(await player_info(_get_platform(bot), event.get_user_id(), _index, _server_name))
 
     @(player_list := _build(
         Command("玩家状态列表", "查询目前已经绑定的所有玩家信息")
