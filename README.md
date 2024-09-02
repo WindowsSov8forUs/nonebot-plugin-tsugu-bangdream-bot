@@ -112,6 +112,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 | TSUGU_SEARCH_EVENT_ALIASES | 否 | `()` | 查活动指令别名 |
 | TSUGU_SEARCH_SONG_ALIASES | 否 | `()` | 查曲指令别名 |
 | TSUGU_SONG_CHART_ALIASES | 否 | `()` | 查谱面指令别名 |
+| TSUGU_SONG_RANDOM_ALIASES | 否 | `()` | 随机曲目指令别名 |
 | TSUGU_SONG_META_ALIASES | 否 | `()` | 查歌曲分数表指令别名 |
 | TSUGU_EVENT_STAGE_ALIASES | 否 | `()` | 查试炼舞台指令别名 |
 | TSUGU_SEARCH_GACHA_ALIASES | 否 | `()` | 查卡池指令别名 |
