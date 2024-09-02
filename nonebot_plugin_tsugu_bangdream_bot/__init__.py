@@ -38,6 +38,7 @@ from ._commands import (
     event_stage,
     player_bind,
     player_info,
+    random_song,
     search_card,
     search_song,
     forward_room,
@@ -479,6 +480,15 @@ with namespace("tsugu") as tsugu_namespace:
             await chart_search.finish("错误: 难度名未能匹配任何难度")
         
         await chart_search.finish(await song_chart(_get_platform(bot), event.get_user_id(), song_id.result, difficulty_id))
+
+    @(song_random := _build(
+        Command("随机曲 <word:str*>", "随机曲", meta=meta)
+        .alias("随机")
+        .example("随机曲 lv24 :在所有包含24等级难度的曲中, 随机返回其中一个").example("随机曲 lv24 ag :在所有包含24等级难度的afterglow曲中, 随机返回其中一个"),
+        _config.tsugu_song_random_aliases
+    )).handle()
+    async def _(word: List[str], bot: Bot, event: Event) -> None:
+        await song_random.finish(await random_song(_get_platform(bot), event.get_user_id(), " ".join(word)))
 
     @(meta_search := _build(
         Command("查询分数表 <server_name:str>", "查询分数表", meta=meta)

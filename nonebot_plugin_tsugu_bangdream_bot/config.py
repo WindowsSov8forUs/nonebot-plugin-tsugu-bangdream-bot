@@ -106,6 +106,7 @@ class Config(BaseModel):
     tsugu_search_event_aliases: Set[str] = set()
     tsugu_search_song_aliases: Set[str] = set()
     tsugu_song_chart_aliases: Set[str] = set()
+    tsugu_song_random_aliases: Set[str] = set()
     tsugu_song_meta_aliases: Set[str] = set()
     tsugu_event_stage_aliases: Set[str] = set()
     tsugu_search_gacha_aliases: Set[str] = set()

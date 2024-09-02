@@ -1,5 +1,5 @@
 from base64 import b64decode
-from typing import List, Type, Tuple, Union, Optional
+from typing import List, Type, Union, Optional
 
 from nonebot import logger
 
@@ -8,7 +8,6 @@ from nonebot_plugin_alconna import Text, Image, Segment, UniMessage, AlconnaMatc
 import tsugu_api_async
 from tsugu_api_core.exception import FailedException
 from tsugu_api_core._typing import (
-    _Server,
     _Response,
     _ServerId,
     _TsuguUser,
@@ -412,6 +411,23 @@ async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: _
 
     try:
         response = await tsugu_api_async.song_chart(servers, song_id, difficulty_id)
+    except FailedException as exception:
+        return exception.response["data"]
+    except Exception as exception:
+        return f"错误: {exception}"
+    
+    return _list_to_message(response)
+
+async def random_song(platform: str, user_id: str, text: str) -> Union[str, UniMessage]:
+    try:
+        tsugu_user = await _get_tsugu_user(platform, user_id)
+    except Exception as exception:
+        return str(exception)
+    
+    main_server = tsugu_user["mainServer"]
+
+    try:
+        response = await tsugu_api_async.song_random(main_server, text=text)
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
