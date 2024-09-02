@@ -639,7 +639,9 @@ async def _(arp: Arparma) -> None:
             return await _help.skip()
         slot = cmds[index]
         try:
-            executor = referent(slot).executor
+            _matcher = referent(slot)
+            assert _matcher is not None
+            executor = _matcher.executor
             msg = await executor.output_converter("help", slot.get_help())
             msg = msg or slot.get_help()
         except Exception:
