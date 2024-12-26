@@ -21,7 +21,7 @@ from nonebot_plugin_alconna import (
     store_true,
     command_manager,
     referent,
-    on_alconna
+    on_alconna,
 )
 
 require("nonebot_plugin_userinfo")
@@ -193,14 +193,30 @@ async def _(bot: Bot, event: Event, group: Tuple[Any, ...] = RegexGroup()) -> No
     if is_forwarded:
         logger.debug(f"Submitted room number: '{group[0]}'")
 
+# 统一的命令参数预处理，添加帮助指令自动回复
+async def _process_if_unmatch(matcher: AlconnaMatcher, arp: Arparma) -> None:
+    if not arp.matched:
+        # 指令参数格式不匹配
+        error_msg = (
+            str(arp.error_info)
+            + '\n'
+            + matcher.command().get_help()
+        )
+        await matcher.finish(error_msg)
+    else:
+        matcher.skip()
+
 # 统一的命令 build 方法
 def _build(cmd: Command, aliases: Set[str]) -> Type[AlconnaMatcher]:
-    return cmd.build(
-        auto_send_output=True,
+    _matcher = cmd.build(
+        skip_for_unmatch=False,
+        auto_send_output=False,
         aliases=aliases,
         extensions=[extension],
         use_cmd_start=True
     )
+    _matcher.handle()(_process_if_unmatch)
+    return _matcher
 
 # 定义 tsugu namespace
 with namespace("tsugu") as tsugu_namespace:
