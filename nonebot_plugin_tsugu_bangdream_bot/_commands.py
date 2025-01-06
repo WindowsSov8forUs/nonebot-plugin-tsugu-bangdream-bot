@@ -36,7 +36,8 @@ async def _get_tsugu_user(platform: str, user_id: str) -> _TsuguUser:
     except FailedException as exception:
         raise exception
     except Exception as exception:
-        raise Exception(f"错误: {exception}")
+        logger.opt(exception=exception).debug('Failed to get user data')
+        raise Exception(f"错误: {exception}") from exception
     
     return response["data"]
 
@@ -116,6 +117,7 @@ async def switch_forward(platform: str, user_id: str, mode: bool) -> str:
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to change user data')
         return f"错误: {exception}"
     
     return (
@@ -130,6 +132,7 @@ async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str
     except FailedException as exception:
         return await matcher.finish(exception.response["data"])
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to request for binding player')
         return await matcher.finish(f"错误: {exception}")
     
     verify_code = response["data"]["verifyCode"]
@@ -163,6 +166,7 @@ async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: s
     except FailedException as exception:
         return await matcher.finish(exception.response["data"])
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to request for unbinding player')
         return await matcher.finish(f"错误: {exception}")
     
     verify_code = response["data"]["verifyCode"]
@@ -182,6 +186,7 @@ async def switch_main_server(platform: str, user_id: str, server: _ServerId) -> 
             {"mainServer": server}
         )
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to change main server')
         return f"错误: {exception}"
     
     if response["status"] == "failed":
@@ -200,6 +205,7 @@ async def set_default_servers(platform: str, user_id: str, servers: List[_Server
             {"displayedServerList": servers}
         )
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to change default servers')
         return f"错误: {exception}"
     
     if response["status"] == "failed":
@@ -286,6 +292,7 @@ async def switch_player_index(platform: str, user_id: str, index: int) -> str:
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to change user player index')
         return f"错误: {exception}"
     
     return f"已切换至绑定信息ID: {index}"
@@ -304,6 +311,7 @@ async def search_player(platform: str, user_id: str, player_id: int, server: Opt
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search player')
         return f"错误: {exception}"
 
 async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
@@ -312,6 +320,7 @@ async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to query all room')
         return f"错误: {exception}"
     
     try:
@@ -319,6 +328,7 @@ async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to request for rendering room list')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -336,6 +346,7 @@ async def search_card(platform: str, user_id: str, word: str) -> Union[str, UniM
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search card')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -346,6 +357,7 @@ async def get_card_illustration(card_id: int) -> Union[str, UniMessage]:
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to get card illustration')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -363,6 +375,7 @@ async def search_character(platform: str, user_id: str, text: str) -> Union[str,
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search character')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -380,6 +393,7 @@ async def search_event(platform: str, user_id: str, text: str) -> Union[str, Uni
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search event')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -397,6 +411,7 @@ async def search_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search song')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -414,6 +429,7 @@ async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: _
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to get song chart')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -431,6 +447,7 @@ async def random_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to get random song')
         return f"错误: {exception}"
     
     return _list_to_message(response)
@@ -450,6 +467,7 @@ async def song_meta(platform: str, user_id: str, server: Optional[_ServerId]=Non
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to get song meta')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -467,6 +485,7 @@ async def event_stage(platform: str, user_id: str, event_id: Optional[int]=None,
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to get event stage')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -484,6 +503,7 @@ async def search_gacha(platform: str, user_id: str, gacha_id: int) -> Union[str,
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search gacha')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -502,6 +522,7 @@ async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search cutoff')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -520,6 +541,7 @@ async def search_ycx_all(platform: str, user_id: str, server: Optional[_ServerId
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search all cutoff')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -538,6 +560,7 @@ async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optiona
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to search cutoff history')
         return f"错误: {exception}"
 
     return _list_to_message(response)
@@ -555,6 +578,7 @@ async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None,
     except FailedException as exception:
         return exception.response["data"]
     except Exception as exception:
+        logger.opt(exception=exception).debug('Failed to simulate gacha')
         return f"错误: {exception}"
 
     return _list_to_message(response)
