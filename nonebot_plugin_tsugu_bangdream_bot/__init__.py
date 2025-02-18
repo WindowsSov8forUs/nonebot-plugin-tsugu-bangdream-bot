@@ -84,10 +84,22 @@ __plugin_meta__ = PluginMetadata(
     )
 )
 
-if "httpx" in get_driver().type:
-    tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
-elif "aiohttp" in get_driver().type:
-    tsugu_api_async.settings.client = tsugu_api_async.settings.Client.AIO_HTTP
+try:
+    from . import _client
+    from tsugu_api_core import register_client
+    
+    register_client(_client.Client)
+except ImportError:
+    # 尝试导入两个内置客户端适配的库
+    try:
+        import httpx
+        tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
+    except ImportError:
+        try:
+            import aiohttp
+            tsugu_api_async.settings.client = tsugu_api_async.settings.Client.AIO_HTTP
+        except ImportError:
+            raise ImportError("Failed to import httpx and aiohttp, please install one of them to use this plugin.")
 
 tsugu_api_async.settings.use_easy_bg = _config.tsugu_use_easy_bg
 tsugu_api_async.settings.compress = _config.tsugu_compress
