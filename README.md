@@ -36,6 +36,19 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 
 ## 💿 安装
 
+>
+> ⚠ 使用警告 ⚠
+> 若运行本插件时出现了如下异常信息：
+>
+> ```bash
+> ImportError: Failed to import httpx and aiohttp, please install one of them to use this plugin.
+> ```
+>
+> 表示你的 Nonebot 项目没有使用 HTTP 客户端驱动，也没有运行在安装了 `httpx` 库或 `aiohttp` 库的环境。
+>
+> 请确保使用了 HTTP 客户端驱动或安装了这两个库的其中一个。
+>
+
 <details open>
 <summary>使用 nb-cli 安装</summary>
 在 nonebot2 项目的根目录下打开命令行, 输入以下指令即可安装
