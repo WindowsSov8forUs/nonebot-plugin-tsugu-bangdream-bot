@@ -38,6 +38,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 
 >
 > ⚠ 使用警告 ⚠
+>
 > 若运行本插件时出现了如下异常信息：
 >
 > ```bash
