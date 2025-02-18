@@ -13,6 +13,7 @@ from typing_extensions import override
 
 from nonebot.drivers import Request as NonebotRequest
 
+from tsugu_api_core import settings
 from tsugu_api_core.client import Client as _Client
 from tsugu_api_core.client import Request, Response
 
@@ -26,7 +27,10 @@ class Client(_Client):
     
     @override
     async def __aenter__(self) -> 'Client':
-        self._session = self._client.get_session()
+        self._session = self._client.get_session(
+            timeout=settings.timeout,
+            proxy=settings.proxy if self.proxy and settings.proxy else None,
+        )
         await self._session.__aenter__()
         return self
     
