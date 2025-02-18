@@ -52,12 +52,13 @@ class Client(_Client):
             headers=request.headers,
         )
         _response = await self._client.request(_request)
+        if _response.content is None:
+            raise RuntimeError("Response content is None")
         
         return Response(
             (
                 _response.content if isinstance(_response.content, bytes)
-                else _response.content.encode() if isinstance(_response.content, str)
-                else bytes(_response.content)
+                else _response.content.encode() # type: ignore
             ),
             _response.status_code,
         )
