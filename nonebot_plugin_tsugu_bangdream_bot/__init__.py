@@ -1,4 +1,4 @@
-from typing import Any, Set, List, Type, Tuple, Union
+from typing import TYPE_CHECKING, Any, Set, List, Type, Tuple, Union
 
 from nonebot.log import logger
 from nonebot.adapters import Bot, Event, Message
@@ -63,8 +63,11 @@ from ._commands import (
 )
 
 import tsugu_api_async
-from tsugu_api_core._typing import _ServerId
 from tsugu_api_core.exception import FailedException
+
+if TYPE_CHECKING:
+    
+    from tsugu_api_core._typing import ServerId
 
 _config = get_plugin_config(Config)
 _command_start = get_driver().config.command_start
@@ -349,7 +352,7 @@ with namespace("tsugu") as tsugu_namespace:
         aliases=_config.tsugu_default_servers_aliases
     )).handle()
     async def _(server_list: List[str], bot: Bot, event: Event) -> None:
-        servers: List[_ServerId] = []
+        servers: List['ServerId'] = []
         for _server in server_list:
             try:
                 _id = server_name_to_id(_server)

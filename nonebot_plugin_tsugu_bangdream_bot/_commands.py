@@ -1,5 +1,5 @@
 from base64 import b64decode
-from typing import List, Type, Union, Optional
+from typing import TYPE_CHECKING, List, Type, Union, Optional
 
 from nonebot import logger
 
@@ -7,20 +7,23 @@ from nonebot_plugin_alconna import Text, Image, Segment, UniMessage, AlconnaMatc
 
 import tsugu_api_async
 from tsugu_api_core.exception import FailedException
-from tsugu_api_core._typing import (
-    _Response,
-    _ServerId,
-    _TsuguUser,
-    _DifficultyId,
-    _UserPlayerInList,
-    _FuzzySearchResult
-)
+
+if TYPE_CHECKING:
+    
+    from tsugu_api_core._typing import (
+        _Response,
+        ServerId,
+        _TsuguUser,
+        _DifficultyId,
+        _UserPlayerInList,
+        FuzzySearchResult
+    )
 
 from .config import CAR, FAKE
 
 from ._utils import server_id_to_full_name
 
-def _list_to_message(response: _Response) -> UniMessage:
+def _list_to_message(response: '_Response') -> UniMessage:
     segments: List[Segment] = []
     for _r in response:
         if _r["type"] == "string":
@@ -41,7 +44,7 @@ async def _get_tsugu_user(platform: str, user_id: str) -> _TsuguUser:
     
     return response["data"]
 
-def _get_user_player_from_tsugu_user(tsugu_user: _TsuguUser, server: Optional[_ServerId]=None, index: Optional[int]=None) -> _UserPlayerInList:
+def _get_user_player_from_tsugu_user(tsugu_user: _TsuguUser, server: Optional['ServerId']=None, index: Optional[int]=None) -> _UserPlayerInList:
     server = server or tsugu_user["mainServer"]
     user_player_list = tsugu_user["userPlayerList"]
     user_player_index = index or tsugu_user["userPlayerIndex"]
@@ -126,7 +129,7 @@ async def switch_forward(platform: str, user_id: str, mode: bool) -> str:
         + "车牌转发"
     )
 
-async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: _ServerId) -> None:
+async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: 'ServerId') -> None:
     try:
         response = await tsugu_api_async.bind_player_request(platform, user_id)
     except FailedException as exception:
@@ -144,7 +147,7 @@ async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str
         + f"{verify_code}"
     )
 
-async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: _ServerId, index: Optional[int]=None) -> None:
+async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: str, server: 'ServerId', index: Optional[int]=None) -> None:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except FailedException as exception:
@@ -178,7 +181,7 @@ async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: s
         + f"{verify_code}"
     )
 
-async def switch_main_server(platform: str, user_id: str, server: _ServerId) -> str:
+async def switch_main_server(platform: str, user_id: str, server: 'ServerId') -> str:
     try:
         response = await tsugu_api_async.change_user_data(
             platform,
@@ -197,7 +200,7 @@ async def switch_main_server(platform: str, user_id: str, server: _ServerId) -> 
         f"已切换到{server_id_to_full_name(server)}模式"
     )
 
-async def set_default_servers(platform: str, user_id: str, servers: List[_ServerId]) -> str:
+async def set_default_servers(platform: str, user_id: str, servers: List['ServerId']) -> str:
     try:
         response = await tsugu_api_async.change_user_data(
             platform,
@@ -297,7 +300,7 @@ async def switch_player_index(platform: str, user_id: str, index: int) -> str:
     
     return f"已切换至绑定信息ID: {index}"
 
-async def search_player(platform: str, user_id: str, player_id: int, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
+async def search_player(platform: str, user_id: str, player_id: int, server: Optional['ServerId']=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
@@ -452,7 +455,7 @@ async def random_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     
     return _list_to_message(response)
 
-async def song_meta(platform: str, user_id: str, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
+async def song_meta(platform: str, user_id: str, server: Optional['ServerId']=None) -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
@@ -508,7 +511,7 @@ async def search_gacha(platform: str, user_id: str, gacha_id: int) -> Union[str,
 
     return _list_to_message(response)
 
-async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
+async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional['ServerId']=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
@@ -527,7 +530,7 @@ async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[
 
     return _list_to_message(response)
 
-async def search_ycx_all(platform: str, user_id: str, server: Optional[_ServerId]=None, event_id: Optional[int]=None) -> Union[str, UniMessage]:
+async def search_ycx_all(platform: str, user_id: str, server: Optional['ServerId']=None, event_id: Optional[int]=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
@@ -546,7 +549,7 @@ async def search_ycx_all(platform: str, user_id: str, server: Optional[_ServerId
 
     return _list_to_message(response)
 
-async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional[_ServerId]=None) -> Union[str, UniMessage]:
+async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optional[int]=None, server: Optional['ServerId']=None) -> Union[str, UniMessage]:
     if server is None:
         try:
             tsugu_user = await _get_tsugu_user(platform, user_id)
@@ -583,7 +586,7 @@ async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None,
 
     return _list_to_message(response)
 
-async def get_fuzzy_search_result(text: str) -> _FuzzySearchResult:
+async def get_fuzzy_search_result(text: str) -> 'FuzzySearchResult':
     try:
         response = await tsugu_api_async.fuzzy_search(text)
     except:
@@ -591,7 +594,7 @@ async def get_fuzzy_search_result(text: str) -> _FuzzySearchResult:
     
     return response["data"]
 
-async def server_name_fuzzy_search(server_name: str) -> _ServerId:
+async def server_name_fuzzy_search(server_name: str) -> 'ServerId':
     result = await get_fuzzy_search_result(server_name)
     result_server = result.get("server", [])
     if len(result_server) < 1 or not result_server[0] in (0, 1, 2, 3, 4):
