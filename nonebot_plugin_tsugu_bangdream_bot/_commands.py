@@ -419,7 +419,7 @@ async def search_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     
     return _list_to_message(response)
 
-async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: _DifficultyId) -> Union[str, UniMessage]:
+async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: '_DifficultyId') -> Union[str, UniMessage]:
     try:
         tsugu_user = await _get_tsugu_user(platform, user_id)
     except Exception as exception:
@@ -602,7 +602,7 @@ async def server_name_fuzzy_search(server_name: str) -> 'ServerId':
     
     return result_server[0]
 
-async def difficulty_id_fuzzy_search(difficulty_name: str) -> _DifficultyId:
+async def difficulty_id_fuzzy_search(difficulty_name: str) -> '_DifficultyId':
     if difficulty_name in ("ez", "easy", "简单"):
         return 0
     if difficulty_name in ("nm", "normal", "普通"):
