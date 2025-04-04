@@ -33,7 +33,7 @@ def _list_to_message(response: '_Response') -> UniMessage:
     
     return UniMessage(segments)
 
-async def _get_tsugu_user(platform: str, user_id: str) -> _TsuguUser:
+async def _get_tsugu_user(platform: str, user_id: str) -> '_TsuguUser':
     try:
         response = await tsugu_api_async.get_user_data(platform, user_id)
     except FailedException as exception:
@@ -44,7 +44,7 @@ async def _get_tsugu_user(platform: str, user_id: str) -> _TsuguUser:
     
     return response["data"]
 
-def _get_user_player_from_tsugu_user(tsugu_user: _TsuguUser, server: Optional['ServerId']=None, index: Optional[int]=None) -> _UserPlayerInList:
+def _get_user_player_from_tsugu_user(tsugu_user: '_TsuguUser', server: Optional['ServerId']=None, index: Optional[int]=None) -> '_UserPlayerInList':
     server = server or tsugu_user["mainServer"]
     user_player_list = tsugu_user["userPlayerList"]
     user_player_index = index or tsugu_user["userPlayerIndex"]
@@ -67,7 +67,7 @@ def _get_user_player_from_tsugu_user(tsugu_user: _TsuguUser, server: Optional['S
 async def forward_room(
     room_number: int,
     raw_message: str,
-    tsugu_user: _TsuguUser,
+    tsugu_user: '_TsuguUser',
     platform: str,
     user_id: str,
     user_name: str,

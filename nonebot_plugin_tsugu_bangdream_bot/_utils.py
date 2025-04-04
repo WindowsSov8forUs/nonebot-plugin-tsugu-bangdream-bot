@@ -1,6 +1,7 @@
-from typing import List
+from typing import TYPE_CHECKING, List
 
-from tsugu_api_core._typing import _ServerId, _ServerName
+if TYPE_CHECKING:
+    from tsugu_api_core._typing import ServerId, ServerName
 
 TIER_LISTS = {
     "jp": [20, 30, 40, 50, 100, 200, 300, 400, 500, 1000, 2000, 5000, 10000, 20000, 30000, 50000],
@@ -111,7 +112,7 @@ USAGES = {
     抽卡模拟 300 922 :模拟抽卡300次，卡池为922号卡池"""
 }
 
-def server_name_to_id(server: str) -> _ServerId:
+def server_name_to_id(server: str) -> 'ServerId':
     if server == "0":
         return 0
     elif server == "1":
@@ -145,7 +146,7 @@ def server_name_to_id(server: str) -> _ServerId:
     else:
         raise ValueError("服务器不存在")
 
-def server_id_to_full_name(server: _ServerId) -> str:
+def server_id_to_full_name(server: 'ServerId') -> str:
     if server == 0:
         return "日服"
     elif server == 1:
@@ -159,7 +160,7 @@ def server_id_to_full_name(server: _ServerId) -> str:
     else:
         raise ValueError("服务器不存在")
 
-def server_id_to_short_name(server: _ServerId) -> _ServerName:
+def server_id_to_short_name(server: 'ServerId') -> 'ServerName':
     if server == 0:
         return "jp"
     elif server == 1:
