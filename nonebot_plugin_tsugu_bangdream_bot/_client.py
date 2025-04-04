@@ -1,5 +1,8 @@
 '''`tsugu_api` HTTP 客户端的 `nonebot` 驱动实现'''
 
+from json import dumps
+from typing_extensions import cast
+
 from nonebot import get_driver
 from nonebot.drivers import HTTPClientMixin, HTTPClientSession
 
@@ -52,7 +55,7 @@ class Client(_Client):
             request.method,
             request.url,
             params=request.params,
-            json=request.data,
+            data=cast(dict, dumps(request.data)) if request.data else None,
             headers=request.headers,
         )
         _response = await self._client.request(_request)
