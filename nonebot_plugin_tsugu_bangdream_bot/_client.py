@@ -52,7 +52,7 @@ class Client(_Client):
             request.method,
             request.url,
             params=request.params,
-            data=request.data,
+            json=request.data,
             headers=request.headers,
         )
         _response = await self._client.request(_request)
@@ -62,7 +62,7 @@ class Client(_Client):
         return Response(
             (
                 _response.content if isinstance(_response.content, bytes)
-                else _response.content.encode() # type: ignore
+                else _response.content # type: ignore
             ),
             _response.status_code,
         )
