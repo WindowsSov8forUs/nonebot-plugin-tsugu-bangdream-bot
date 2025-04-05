@@ -50,7 +50,9 @@ def _get_user_player_from_tsugu_user(tsugu_user: '_TsuguUser', server: Optional[
     user_player_index = index or tsugu_user["userPlayerIndex"]
     
     if len(user_player_list) == 0:
-        raise ValueError("用户未绑定player")
+        exception = ValueError("用户未绑定player")
+        logger.opt(exception=exception).debug('User player list is empty')
+        raise exception
     
     if index is not None:
         return user_player_list[index]
@@ -62,7 +64,9 @@ def _get_user_player_from_tsugu_user(tsugu_user: '_TsuguUser', server: Optional[
         if user_player["server"] == server:
             return user_player
     
-    raise ValueError("用户在对应服务器上未绑定player")
+    exception = ValueError("用户在对应服务器上未绑定player")
+    logger.opt(exception=exception).debug('User player not found in server')
+    raise exception
 
 async def forward_room(
     room_number: int,
@@ -133,6 +137,7 @@ async def player_bind(matcher: Type[AlconnaMatcher], platform: str, user_id: str
     try:
         response = await tsugu_api_async.bind_player_request(platform, user_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to request for binding player')
         return await matcher.finish(exception.response["data"])
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to request for binding player')
@@ -167,6 +172,7 @@ async def player_unbind(matcher: Type[AlconnaMatcher], platform: str, user_id: s
     try:
         response = await tsugu_api_async.bind_player_request(platform, user_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to request for unbinding player')
         return await matcher.finish(exception.response["data"])
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to request for unbinding player')
@@ -239,6 +245,7 @@ async def player_info(platform: str, user_id: str, index: Optional[int]=None, se
             try:
                 server = await server_name_fuzzy_search(server_name)
             except ValueError as exception:
+                logger.opt(exception=exception).debug('Failed to search server name')
                 return str(exception)
             
             try:
@@ -247,6 +254,7 @@ async def player_info(platform: str, user_id: str, index: Optional[int]=None, se
                 return str(exception)
     else:
         if index > len(player_list) or index < 1:
+            logger.debug(f"Invalid index: {index}")
             return "错误: 无效的绑定信息ID"
         player = player_list[index - 1]
     
@@ -284,6 +292,7 @@ async def switch_player_index(platform: str, user_id: str, index: int) -> str:
         return str(exception)
     
     if index > len(tsugu_user["userPlayerList"]) or index < 1:
+        logger.debug(f"Invalid index: {index}")
         return "错误: 无效的绑定信息ID"
     
     try:
@@ -293,6 +302,7 @@ async def switch_player_index(platform: str, user_id: str, index: int) -> str:
             {"userPlayerIndex": index - 1}
         )
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to change user player index')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to change user player index')
@@ -312,6 +322,7 @@ async def search_player(platform: str, user_id: str, player_id: int, server: Opt
     try:
         return _list_to_message(await tsugu_api_async.search_player(player_id, server))
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search player')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search player')
@@ -321,6 +332,7 @@ async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
     try:
         _response = await tsugu_api_async.station_query_all_room()
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to query all room')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to query all room')
@@ -329,6 +341,7 @@ async def room_list(keyword: Optional[str]=None) -> Union[str, UniMessage]:
     try:
         response = await tsugu_api_async.room_list(_response["data"])
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to request for rendering room list')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to request for rendering room list')
@@ -347,6 +360,7 @@ async def search_card(platform: str, user_id: str, word: str) -> Union[str, UniM
     try:
         response = await tsugu_api_async.search_card(servers, word)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search card')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search card')
@@ -358,6 +372,7 @@ async def get_card_illustration(card_id: int) -> Union[str, UniMessage]:
     try:
         response = await tsugu_api_async.get_card_illustration(card_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to get card illustration')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to get card illustration')
@@ -376,6 +391,7 @@ async def search_character(platform: str, user_id: str, text: str) -> Union[str,
     try:
         response = await tsugu_api_async.search_character(servers, text=text)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search character')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search character')
@@ -394,6 +410,7 @@ async def search_event(platform: str, user_id: str, text: str) -> Union[str, Uni
     try:
         response = await tsugu_api_async.search_event(servers, text=text)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search event')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search event')
@@ -412,6 +429,7 @@ async def search_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     try:
         response = await tsugu_api_async.search_song(servers, text=text)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search song')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search song')
@@ -430,6 +448,7 @@ async def song_chart(platform: str, user_id: str, song_id: int, difficulty_id: '
     try:
         response = await tsugu_api_async.song_chart(servers, song_id, difficulty_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to get song chart')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to get song chart')
@@ -448,6 +467,7 @@ async def random_song(platform: str, user_id: str, text: str) -> Union[str, UniM
     try:
         response = await tsugu_api_async.song_random(main_server, text=text)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to get random song')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to get random song')
@@ -468,6 +488,7 @@ async def song_meta(platform: str, user_id: str, server: Optional['ServerId']=No
     try:
         response = await tsugu_api_async.song_meta(servers, server)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to get song meta')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to get song meta')
@@ -486,6 +507,7 @@ async def event_stage(platform: str, user_id: str, event_id: Optional[int]=None,
     try:
         response = await tsugu_api_async.event_stage(server, event_id, meta)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to get event stage')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to get event stage')
@@ -504,6 +526,7 @@ async def search_gacha(platform: str, user_id: str, gacha_id: int) -> Union[str,
     try:
         response = await tsugu_api_async.search_gacha(servers, gacha_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search gacha')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search gacha')
@@ -523,6 +546,7 @@ async def search_ycx(platform: str, user_id: str, tier: int, event_id: Optional[
     try:
         response = await tsugu_api_async.cutoff_detail(server, tier, event_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search cutoff')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search cutoff')
@@ -542,6 +566,7 @@ async def search_ycx_all(platform: str, user_id: str, server: Optional['ServerId
     try:
         response = await tsugu_api_async.cutoff_all(server, event_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search all cutoff')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search all cutoff')
@@ -561,6 +586,7 @@ async def search_lsycx(platform: str, user_id: str, tier: int, event_id: Optiona
     try:
         response = await tsugu_api_async.cutoff_list_of_recent_event(server, tier, event_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to search cutoff history')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to search cutoff history')
@@ -579,6 +605,7 @@ async def simulate_gacha(platform: str, user_id: str, times: Optional[int]=None,
     try:
         response = await tsugu_api_async.gacha_simulate(server, times, gacha_id)
     except FailedException as exception:
+        logger.opt(exception=exception).debug('Failed to simulate gacha')
         return exception.response["data"]
     except Exception as exception:
         logger.opt(exception=exception).debug('Failed to simulate gacha')
