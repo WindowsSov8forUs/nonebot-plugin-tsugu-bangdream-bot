@@ -1,5 +1,6 @@
 '''`tsugu_api` HTTP 客户端的 `nonebot` 驱动实现'''
 
+import asyncio
 from json import dumps
 from typing_extensions import cast
 
@@ -14,6 +15,7 @@ if not isinstance(driver, HTTPClientMixin):
 from typing import Any
 from typing_extensions import override
 
+from nonebot import logger
 from nonebot.drivers import Request as NonebotRequest
 
 from tsugu_api_core import settings
@@ -68,6 +70,8 @@ class Client(_Client):
                 if retries >= settings.max_retries:
                     raise e
                 retries += 1
+                logger.debug(f"Request failed: {repr(e)}, retrying for the {retries}/{settings.max_retries} time...")
+                await asyncio.sleep(1)
         
         if _response.content is None:
             raise RuntimeError("Response content is None")
