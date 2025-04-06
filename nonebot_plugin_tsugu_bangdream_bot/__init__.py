@@ -93,14 +93,15 @@ except ImportError:
     # 尝试导入两个内置客户端适配的库
     try:
         import httpx
-        tsugu_api_async.settings.client = tsugu_api_async.settings.Client.HTTPX
+        tsugu_api_async.settings.client = 'httpx'
     except ImportError:
         try:
             import aiohttp
-            tsugu_api_async.settings.client = tsugu_api_async.settings.Client.AIO_HTTP
+            tsugu_api_async.settings.client = 'aiohttp'
         except ImportError:
             raise ImportError("Failed to import httpx and aiohttp, please install one of them to use this plugin.")
 
+tsugu_api_async.settings.max_retries = _config.tsugu_retries
 tsugu_api_async.settings.use_easy_bg = _config.tsugu_use_easy_bg
 tsugu_api_async.settings.compress = _config.tsugu_compress
 

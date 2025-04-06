@@ -58,7 +58,17 @@ class Client(_Client):
             data=cast(dict, dumps(request.data)) if request.data else None,
             headers=request.headers,
         )
-        _response = await self._client.request(_request)
+
+        retries = 0
+        while True:
+            try:
+                _response = await self._client.request(_request)
+                break
+            except Exception as e:
+                if retries >= settings.max_retries:
+                    raise e
+                retries += 1
+        
         if _response.content is None:
             raise RuntimeError("Response content is None")
         

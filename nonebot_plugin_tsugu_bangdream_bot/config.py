@@ -80,6 +80,8 @@ class Config(BaseModel):
     tsugu_reply: bool = False
     tsugu_at: bool = False
     tsugu_no_space: bool = False
+
+    tsugu_retries: int = 3
     
     tsugu_backend_url: str = ""
     tsugu_data_backend_url: str = ""
