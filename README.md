@@ -103,6 +103,7 @@ _✨ [Koishi-Plugin-Tsugu-BanGDream-Bot](https://github.com/Yamamoto-2/tsugu-ban
 | TSUGU_REPLY | 否 | `False` | 消息是否回复用户 |
 | TSUGU_AT | 否 | `False` | 消息是否@用户 |
 | TSUGU_NO_SPACE | 否 | `False` | 是否启用无需空格触发大部分指令，启用这将方便一些用户使用习惯，但会增加bot误判概率，仍然建议使用空格 |
+| TSUGU_RETRIES | 否 | `3` | 重试次数配置，配置 `<= 0` 时代表关闭重试机制 |
 | TSUGU_BACKEND_URL | 否 | `"http://tsugubot.com:8080"` | 后端服务器地址，用于处理指令。如果有自建服务器，可以改成自建服务器地址。默认为Tsugu公共后端服务器。 |
 | TSUGU_DATA_BACKEND_URL | 否 | `"http://tsugubot.com:8080"` | 用户数据后端服务器地址，用于处理用户与车牌指令。如果有自建服务器，可以改成自建服务器地址。默认为Tsugu公共后端服务器。 |
 | TSUGU_PROXY | 否 | `""` | 使用的代理服务器。在部分地区，网络环境可能无法连接后端服务器。通过此配置项配置代理服务器。 |
