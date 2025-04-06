@@ -18,7 +18,7 @@ from typing_extensions import override
 from nonebot import logger
 from nonebot.drivers import Request as NonebotRequest
 
-from tsugu_api_core import settings
+from tsugu_api_async import settings
 from tsugu_api_core.client import Client as _Client
 from tsugu_api_core.client import Request, Response
 
