@@ -223,13 +223,15 @@ async def _process_if_unmatch(matcher: AlconnaMatcher, arp: Arparma) -> None:
         matcher.skip()
 
 # 统一的命令 build 方法
-def _build(cmd: Command, aliases: Set[str]) -> Type[AlconnaMatcher]:
+def _build(cmd: Command, aliases: Set[str], *, priority: int = 1, block: bool = False) -> Type[AlconnaMatcher]:
     _matcher = cmd.build(
         skip_for_unmatch=False,
         auto_send_output=False,
         aliases=aliases,
         extensions=[extension],
-        use_cmd_start=True
+        use_cmd_start=True,
+        priority=priority,
+        block=block,
     )
     _matcher.handle()(_process_if_unmatch)
     return _matcher
@@ -382,7 +384,8 @@ with namespace("tsugu") as tsugu_namespace:
     @(player_status := _build(
         Command("玩家状态 [index:int] [server_name:str]", "查询自己的玩家状态", meta=meta)
         .shortcut(r"(.+服)玩家状态$", {"args": ["{0}"], "command": f"{list(_command_start)[0]}玩家状态"}),
-        _config.tsugu_player_status_aliases
+        _config.tsugu_player_status_aliases,
+        block=True
     )).handle()
     async def _(index: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
         if index.available:
@@ -400,7 +403,8 @@ with namespace("tsugu") as tsugu_namespace:
     @(player_list := _build(
         Command("玩家状态列表", "查询目前已经绑定的所有玩家信息")
         .alias("玩家列表").alias("玩家信息列表"),
-        _config.tsugu_player_list_aliases
+        _config.tsugu_player_list_aliases,
+        priority=2
     )).handle()
     async def _(bot: Bot, event: Event) -> None:
         return await player_list.finish(await get_player_list(_get_platform(bot), event.get_user_id()))
@@ -457,7 +461,8 @@ with namespace("tsugu") as tsugu_namespace:
         Command("查卡 <word:str*>", "查卡", meta=meta).alias("查卡牌")
         .usage("根据关键词或卡牌ID查询卡片信息，请使用空格隔开所有参数")
         .example("查卡 1399 :返回1399号卡牌的信息").example("查卡 绿 tsugu :返回所有属性为pure的羽泽鸫的卡牌列表"),
-        _config.tsugu_search_card_aliases
+        _config.tsugu_search_card_aliases,
+        priority=2
     )).handle()
     async def _(word: List[str], bot: Bot, event: Event) -> None:
         await card_search.finish(await search_card(_get_platform(bot), event.get_user_id(), " ".join(word)))
@@ -467,7 +472,8 @@ with namespace("tsugu") as tsugu_namespace:
         .alias("查卡插画").alias("查插画")
         .usage("根据卡片ID查询卡片插画")
         .example("查卡面 1399 :返回1399号卡牌的插画"),
-        _config.tsugu_card_illustration_aliases
+        _config.tsugu_card_illustration_aliases,
+        block=True
     )).handle()
     async def _(card_id: Match[int]) -> None:
         await card_illustration.finish(await get_card_illustration(card_id.result))
@@ -560,7 +566,8 @@ with namespace("tsugu") as tsugu_namespace:
     @(gacha_search := _build(
         Command("查卡池 <gacha_id:int>", "查卡池", meta=meta)
         .usage("根据卡池ID查询卡池信息"),
-        _config.tsugu_search_gacha_aliases
+        _config.tsugu_search_gacha_aliases,
+        block=True
     )).handle()
     async def _(gacha_id: Match[int], bot: Bot, event: Event) -> None:
         await gacha_search.finish(await search_gacha(_get_platform(bot), event.get_user_id(), gacha_id.result))
@@ -571,7 +578,8 @@ with namespace("tsugu") as tsugu_namespace:
             f"查询指定档位的预测线，如果没有服务器名的话，服务器为用户的默认服务器。"
             "如果没有活动ID的话，活动为当前活动\n可用档线:\n{tier_list_of_server_to_string()}"
         ).example("ycx 1000 :返回默认服务器当前活动1000档位的档线与预测线").example("ycx 1000 177 jp:返回日服177号活动1000档位的档线与预测线"),
-        _config.tsugu_ycx_aliases
+        _config.tsugu_ycx_aliases,
+        priority=2
     )).handle()
     async def _(tier: Match[int], event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
         if event_id.available:
@@ -598,7 +606,8 @@ with namespace("tsugu") as tsugu_namespace:
             f"查询所有档位的预测线，如果没有服务器名的话，服务器为用户的默认服务器。"
             "如果没有活动ID的话，活动为当前活动\n可用档线:\n{tier_list_of_server_to_string()}"
         ).alias("myycx"),
-        _config.tsugu_ycx_all_aliases
+        _config.tsugu_ycx_all_aliases,
+        block=True
     )).handle()
     async def _(event_id: Match[int], server_name: Match[str], bot: Bot, event: Event) -> None:
         if event_id.available:
